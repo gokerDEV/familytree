@@ -167,7 +167,11 @@ type ParsedItem = {
 type PersonDraft = Omit<FamilyTreePerson, "id"> & { explicitId?: string };
 type Size = { width: number; height: number };
 type Point = { x: number; y: number };
-type LayoutPerson = Size & { kind: "person"; node: FamilyTreePersonNode; unions: LayoutUnion[] };
+type LayoutPerson = Size & {
+  kind: "person";
+  node: FamilyTreePersonNode;
+  unions: LayoutUnion[];
+};
 type LayoutUnion = Size & {
   kind: "union";
   node: FamilyTreeUnionNode;
@@ -182,7 +186,9 @@ type RenderContext = {
   document: FamilyTreeDocument;
   personById: Map<string, FamilyTreePerson>;
   unionById: Map<string, FamilyTreeUnion>;
-  options: Required<Omit<FamilyTreeRenderOptions, "theme" | "title" | "indentSize">> & {
+  options: Required<
+    Omit<FamilyTreeRenderOptions, "theme" | "title" | "indentSize">
+  > & {
     title?: string;
     indentSize: number;
   };
@@ -190,7 +196,10 @@ type RenderContext = {
   parts: string[];
 };
 
-export function parseFamilyTree(source: string, options: FamilyTreeParseOptions = {}): FamilyTreeParseResult {
+export function parseFamilyTree(
+  source: string,
+  options: FamilyTreeParseOptions = {},
+): FamilyTreeParseResult {
   const indentSize = options.indentSize ?? 2;
   const issues: FamilyTreeIssue[] = [];
   const document: MutableDocument = {
@@ -214,69 +223,155 @@ export function parseFamilyTree(source: string, options: FamilyTreeParseOptions 
       }
 
       if (rawLine.includes("\t")) {
-        issues.push(issue(line, 1, "error", "tab-indent", "Tab indentation is not supported. Use spaces."));
+        issues.push(
+          issue(
+            line,
+            1,
+            "error",
+            "tab-indent",
+            "Tab indentation is not supported. Use spaces.",
+          ),
+        );
         return;
       }
 
       const match = rawLine.match(/^(\s*)-\s+(.+)$/);
       if (!match) {
-        issues.push(issue(line, 1, "error", "invalid-line", "Expected a markdown list item starting with '-'."));
+        issues.push(
+          issue(
+            line,
+            1,
+            "error",
+            "invalid-line",
+            "Expected a markdown list item starting with '-'.",
+          ),
+        );
         return;
       }
 
       const indent = match[1]?.length ?? 0;
       if (indent % indentSize !== 0) {
-        issues.push(issue(line, indent + 1, "error", "invalid-indent", `Indentation must use ${indentSize} spaces per level.`));
+        issues.push(
+          issue(
+            line,
+            indent + 1,
+            "error",
+            "invalid-indent",
+            `Indentation must use ${indentSize} spaces per level.`,
+          ),
+        );
         return;
       }
 
       const level = indent / indentSize;
       if (level > stack.length) {
-        issues.push(issue(line, indent + 1, "error", "indent-jump", "Indentation can only increase by one level at a time."));
+        issues.push(
+          issue(
+            line,
+            indent + 1,
+            "error",
+            "indent-jump",
+            "Indentation can only increase by one level at a time.",
+          ),
+        );
         return;
       }
 
       stack.length = level;
-      const parsedItem = parseItem(match[2]?.trim() ?? "", indent + 3, line, issues);
+      const parsedItem = parseItem(
+        match[2]?.trim() ?? "",
+        indent + 3,
+        line,
+        issues,
+      );
       if (!parsedItem) return;
 
       const parent = stack[level - 1];
-      const personDraft = parsePerson(parsedItem.personText, line, parsedItem.column, issues);
+      const personDraft = parsePerson(
+        parsedItem.personText,
+        line,
+        parsedItem.column,
+        issues,
+      );
       if (!personDraft) return;
       const person = getOrCreatePerson(document, personDraft);
 
       if (parsedItem.kind === "spouse") {
         if (!parent || parent.node.kind !== "person") {
-          issues.push(issue(line, parsedItem.column, "error", "spouse-without-person", "A spouse relation must be nested under a person."));
+          issues.push(
+            issue(
+              line,
+              parsedItem.column,
+              "error",
+              "spouse-without-person",
+              "A spouse relation must be nested under a person.",
+            ),
+          );
           return;
         }
-        const unionNode = createUnion(document, parsedItem.unionKind ?? "current", [parent.node.personId, person.id], line, parent.node.personId);
+        const unionNode = createUnion(
+          document,
+          parsedItem.unionKind ?? "current",
+          [parent.node.personId, person.id],
+          line,
+          parent.node.personId,
+        );
         parent.node.unions.push(unionNode);
         stack.push({ level, node: unionNode });
         return;
       }
 
       if (parsedItem.partnerText) {
-        const partnerDraft = parsePerson(parsedItem.partnerText, line, parsedItem.column, issues);
+        const partnerDraft = parsePerson(
+          parsedItem.partnerText,
+          line,
+          parsedItem.column,
+          issues,
+        );
         if (!partnerDraft) return;
         const partner = getOrCreatePerson(document, partnerDraft);
 
         if (!parent) {
-          const unionNode = createUnion(document, parsedItem.unionKind ?? "current", [person.id, partner.id], line);
+          const unionNode = createUnion(
+            document,
+            parsedItem.unionKind ?? "current",
+            [person.id, partner.id],
+            line,
+          );
           document.roots.push(unionNode);
           stack.push({ level, node: unionNode });
           return;
         }
 
-        const personNode = createPersonNode(person.id, line, parsedItem.relationKind);
-        attachPerson(document, parent, personNode, parsedItem.relationKind, line);
-        const unionNode = createUnion(document, parsedItem.unionKind ?? "current", [person.id, partner.id], line, person.id);
+        const personNode = createPersonNode(
+          person.id,
+          line,
+          parsedItem.relationKind,
+        );
+        attachPerson(
+          document,
+          parent,
+          personNode,
+          parsedItem.relationKind,
+          line,
+        );
+        const unionNode = createUnion(
+          document,
+          parsedItem.unionKind ?? "current",
+          [person.id, partner.id],
+          line,
+          person.id,
+        );
         personNode.unions.push(unionNode);
         stack.push({ level, node: unionNode });
         return;
       }
 
-      const personNode = createPersonNode(person.id, line, parsedItem.relationKind);
+      const personNode = createPersonNode(
+        person.id,
+        line,
+        parsedItem.relationKind,
+      );
       attachPerson(document, parent, personNode, parsedItem.relationKind, line);
       stack.push({ level, node: personNode });
     });
@@ -304,7 +399,10 @@ export function parseAndRenderFamilyTreeSvg(
   return { result, svg: renderFamilyTreeSvg(result, options) };
 }
 
-export function renderFamilyTreeSvg(input: FamilyTreeParseResult | FamilyTreeDocument, options: FamilyTreeRenderOptions = {}): string {
+export function renderFamilyTreeSvg(
+  input: FamilyTreeParseResult | FamilyTreeDocument,
+  options: FamilyTreeRenderOptions = {},
+): string {
   const document = "document" in input ? input.document : input;
   const theme = { ...DEFAULT_FAMILY_TREE_THEME, ...options.theme };
   const context: RenderContext = {
@@ -326,13 +424,23 @@ export function renderFamilyTreeSvg(input: FamilyTreeParseResult | FamilyTreeDoc
     parts: [],
   };
 
-  const roots = document.roots.map((root) => (root.kind === "person" ? layoutPerson(root, context) : layoutUnion(root, context)));
+  const roots = document.roots.map((root) =>
+    root.kind === "person"
+      ? layoutPerson(root, context)
+      : layoutUnion(root, context),
+  );
   const contentWidth = sumWidths(roots, context.options.siblingGap);
-  const contentHeight = roots.reduce((height, root) => Math.max(height, root.height), 0);
+  const contentHeight = roots.reduce(
+    (height, root) => Math.max(height, root.height),
+    0,
+  );
   const titleHeight = context.options.title ? 44 : 0;
   const legendHeight = context.options.showLegend ? 42 : 0;
   const width = Math.max(640, contentWidth + context.options.padding * 2);
-  const height = Math.max(320, contentHeight + context.options.padding * 2 + titleHeight + legendHeight);
+  const height = Math.max(
+    320,
+    contentHeight + context.options.padding * 2 + titleHeight + legendHeight,
+  );
 
   context.parts.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${round(width)}" height="${round(height)}" viewBox="0 0 ${round(width)} ${round(height)}" role="img">`,
@@ -353,18 +461,40 @@ export function renderFamilyTreeSvg(input: FamilyTreeParseResult | FamilyTreeDoc
     cursorX += root.width + context.options.siblingGap;
   }
 
-  if (context.options.showLegend) renderLegend(width / 2, height - context.options.padding - 10, context);
+  if (context.options.showLegend)
+    renderLegend(width / 2, height - context.options.padding - 10, context);
   context.parts.push("</svg>");
   return context.parts.join("");
 }
 
-function parseItem(content: string, column: number, line: number, issues: FamilyTreeIssue[]): ParsedItem | undefined {
+function parseItem(
+  content: string,
+  column: number,
+  line: number,
+  issues: FamilyTreeIssue[],
+): ParsedItem | undefined {
   if (!content) {
-    issues.push(issue(line, column, "error", "empty-item", "List item cannot be empty."));
+    issues.push(
+      issue(line, column, "error", "empty-item", "List item cannot be empty."),
+    );
     return undefined;
   }
-  if (content.startsWith("x+ ")) return { kind: "spouse", personText: content.slice(3).trim(), relationKind: "biological", unionKind: "former", column };
-  if (content.startsWith("+ ")) return { kind: "spouse", personText: content.slice(2).trim(), relationKind: "biological", unionKind: "current", column };
+  if (content.startsWith("x+ "))
+    return {
+      kind: "spouse",
+      personText: content.slice(3).trim(),
+      relationKind: "biological",
+      unionKind: "former",
+      column,
+    };
+  if (content.startsWith("+ "))
+    return {
+      kind: "spouse",
+      personText: content.slice(2).trim(),
+      relationKind: "biological",
+      unionKind: "current",
+      column,
+    };
 
   let relationKind: FamilyTreeRelationKind = "biological";
   let personText = content;
@@ -388,10 +518,23 @@ function parseItem(content: string, column: number, line: number, issues: Family
   };
 }
 
-function parsePerson(raw: string, line: number, column: number, issues: FamilyTreeIssue[]): PersonDraft | undefined {
+function parsePerson(
+  raw: string,
+  line: number,
+  column: number,
+  issues: FamilyTreeIssue[],
+): PersonDraft | undefined {
   let value = raw.trim();
   if (!value) {
-    issues.push(issue(line, column, "error", "empty-person", "Person definition cannot be empty."));
+    issues.push(
+      issue(
+        line,
+        column,
+        "error",
+        "empty-person",
+        "Person definition cannot be empty.",
+      ),
+    );
     return undefined;
   }
 
@@ -409,7 +552,12 @@ function parsePerson(raw: string, line: number, column: number, issues: FamilyTr
 
   const tags: string[] = [];
   value = value.replace(/\[([^\]]+)\]/g, (_, tagContent: string) => {
-    tags.push(...tagContent.split(",").map((tag) => tag.trim()).filter(Boolean));
+    tags.push(
+      ...tagContent
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    );
     return " ";
   });
 
@@ -427,13 +575,16 @@ function parsePerson(raw: string, line: number, column: number, issues: FamilyTr
 
   const displayName = normalize(value);
   if (!displayName) {
-    issues.push(issue(line, column, "error", "missing-name", "Person name is required."));
+    issues.push(
+      issue(line, column, "error", "missing-name", "Person name is required."),
+    );
     return undefined;
   }
 
   const nameParts = displayName.split(" ");
   const surname = nameParts.length > 1 ? (nameParts.at(-1) ?? "") : "";
-  const name = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : displayName;
+  const name =
+    nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : displayName;
   const parsedDates = parseDateBlock(dates.at(-1));
 
   return {
@@ -450,18 +601,34 @@ function parsePerson(raw: string, line: number, column: number, issues: FamilyTr
   };
 }
 
-function parseDateBlock(value?: string): { birthDate?: string; deathDate?: string } {
+function parseDateBlock(value?: string): {
+  birthDate?: string;
+  deathDate?: string;
+} {
   if (!value) return {};
   const normalized = value.replace(/[–—]/g, "-").trim();
   const yearRange = normalized.match(/^(\d{4})-(\d{4})$/);
   if (yearRange) return { birthDate: yearRange[1], deathDate: yearRange[2] };
   const spacedRange = normalized.match(/^(.+?)\s+-\s+(.+)$/);
-  if (spacedRange) return { birthDate: spacedRange[1]?.trim(), deathDate: spacedRange[2]?.trim() };
+  if (spacedRange)
+    return {
+      birthDate: spacedRange[1]?.trim(),
+      deathDate: spacedRange[2]?.trim(),
+    };
   return { birthDate: normalized };
 }
 
-function getOrCreatePerson(document: MutableDocument, draft: PersonDraft): FamilyTreePerson {
-  const id = draft.explicitId ?? slug([draft.displayName, draft.birthDate, draft.deathDate].filter(Boolean).join("-"));
+function getOrCreatePerson(
+  document: MutableDocument,
+  draft: PersonDraft,
+): FamilyTreePerson {
+  const id =
+    draft.explicitId ??
+    slug(
+      [draft.displayName, draft.birthDate, draft.deathDate]
+        .filter(Boolean)
+        .join("-"),
+    );
   const existing = document.personsById.get(id);
   if (existing) {
     existing.tags = Array.from(new Set([...existing.tags, ...draft.tags]));
@@ -476,32 +643,73 @@ function getOrCreatePerson(document: MutableDocument, draft: PersonDraft): Famil
   return person;
 }
 
-function createPersonNode(personId: string, line: number, incomingRelationKind: FamilyTreeRelationKind): FamilyTreePersonNode {
+function createPersonNode(
+  personId: string,
+  line: number,
+  incomingRelationKind: FamilyTreeRelationKind,
+): FamilyTreePersonNode {
   return { kind: "person", personId, line, incomingRelationKind, unions: [] };
 }
 
-function createUnion(document: MutableDocument, kind: FamilyTreeUnionKind, partnerIds: string[], line: number, anchorPersonId?: string): FamilyTreeUnionNode {
-  const union: FamilyTreeUnion = { id: `u${document.unions.length + 1}`, kind, partnerIds, line, anchorPersonId };
+function createUnion(
+  document: MutableDocument,
+  kind: FamilyTreeUnionKind,
+  partnerIds: string[],
+  line: number,
+  anchorPersonId?: string,
+): FamilyTreeUnionNode {
+  const union: FamilyTreeUnion = {
+    id: `u${document.unions.length + 1}`,
+    kind,
+    partnerIds,
+    line,
+    anchorPersonId,
+  };
   document.unions.push(union);
   return { kind: "union", unionId: union.id, line, children: [] };
 }
 
-function attachPerson(document: MutableDocument, parent: StackEntry | undefined, personNode: FamilyTreePersonNode, kind: FamilyTreeRelationKind, line: number): void {
+function attachPerson(
+  document: MutableDocument,
+  parent: StackEntry | undefined,
+  personNode: FamilyTreePersonNode,
+  kind: FamilyTreeRelationKind,
+  line: number,
+): void {
   if (!parent) {
     document.roots.push(personNode);
     return;
   }
   if (parent.node.kind === "union") {
     parent.node.children.push(personNode);
-    document.childRelations.push({ id: `c${document.childRelations.length + 1}`, unionId: parent.node.unionId, childId: personNode.personId, kind, line });
+    document.childRelations.push({
+      id: `c${document.childRelations.length + 1}`,
+      unionId: parent.node.unionId,
+      childId: personNode.personId,
+      kind,
+      line,
+    });
     return;
   }
-  const unionNode: FamilyTreeUnionNode = { kind: "union", unionId: `implicit-${parent.node.personId}-${personNode.personId}-${line}`, line, children: [personNode] };
+  const unionNode: FamilyTreeUnionNode = {
+    kind: "union",
+    unionId: `implicit-${parent.node.personId}-${personNode.personId}-${line}`,
+    line,
+    children: [personNode],
+  };
   parent.node.unions.push(unionNode);
-  document.childRelations.push({ id: `c${document.childRelations.length + 1}`, parentId: parent.node.personId, childId: personNode.personId, kind, line });
+  document.childRelations.push({
+    id: `c${document.childRelations.length + 1}`,
+    parentId: parent.node.personId,
+    childId: personNode.personId,
+    kind,
+    line,
+  });
 }
 
-function findInlineOperator(value: string): { index: number; operator: "+" | "x+" } | undefined {
+function findInlineOperator(
+  value: string,
+): { index: number; operator: "+" | "x+" } | undefined {
   let quote = false;
   let round = 0;
   let square = 0;
@@ -517,17 +725,42 @@ function findInlineOperator(value: string): { index: number; operator: "+" | "x+
     if (char === "{") curly += 1;
     if (char === "}") curly = Math.max(0, curly - 1);
     if (round || square || curly) continue;
-    if (char === "x" && value[index + 1] === "+" && isSpace(value[index - 1]) && isSpace(value[index + 2])) return { index, operator: "x+" };
-    if (char === "+" && isSpace(value[index - 1]) && isSpace(value[index + 1]) && value[index - 1] !== "x") return { index, operator: "+" };
+    if (
+      char === "x" &&
+      value[index + 1] === "+" &&
+      isSpace(value[index - 1]) &&
+      isSpace(value[index + 2])
+    )
+      return { index, operator: "x+" };
+    if (
+      char === "+" &&
+      isSpace(value[index - 1]) &&
+      isSpace(value[index + 1]) &&
+      value[index - 1] !== "x"
+    )
+      return { index, operator: "+" };
   }
   return undefined;
 }
 
-function layoutPerson(node: FamilyTreePersonNode, context: RenderContext): LayoutPerson {
+function layoutPerson(
+  node: FamilyTreePersonNode,
+  context: RenderContext,
+): LayoutPerson {
   const unions = node.unions.map((union) => layoutUnion(union, context));
-  if (!unions.length) return { kind: "person", node, unions, width: context.options.cardWidth, height: context.options.cardHeight };
+  if (!unions.length)
+    return {
+      kind: "person",
+      node,
+      unions,
+      width: context.options.cardWidth,
+      height: context.options.cardHeight,
+    };
   const unionWidth = sumWidths(unions, context.options.siblingGap);
-  const unionHeight = unions.reduce((max, union) => Math.max(max, union.height), 0);
+  const unionHeight = unions.reduce(
+    (max, union) => Math.max(max, union.height),
+    0,
+  );
   return {
     kind: "person",
     node,
@@ -537,15 +770,28 @@ function layoutPerson(node: FamilyTreePersonNode, context: RenderContext): Layou
   };
 }
 
-function layoutUnion(node: FamilyTreeUnionNode, context: RenderContext): LayoutUnion {
+function layoutUnion(
+  node: FamilyTreeUnionNode,
+  context: RenderContext,
+): LayoutUnion {
   const union = context.unionById.get(node.unionId);
-  const visiblePartnerIds = union ? union.partnerIds.filter((id) => id !== union.anchorPersonId) : [];
+  const visiblePartnerIds = union
+    ? union.partnerIds.filter((id) => id !== union.anchorPersonId)
+    : [];
   const partnerCount = Math.max(visiblePartnerIds.length, 1);
-  const partnerRowWidth = visiblePartnerIds.length ? partnerCount * context.options.cardWidth + (partnerCount - 1) * context.options.partnerGap : 24;
-  const partnerRowHeight = visiblePartnerIds.length ? context.options.cardHeight : 24;
+  const partnerRowWidth = visiblePartnerIds.length
+    ? partnerCount * context.options.cardWidth +
+      (partnerCount - 1) * context.options.partnerGap
+    : 24;
+  const partnerRowHeight = visiblePartnerIds.length
+    ? context.options.cardHeight
+    : 24;
   const children = node.children.map((child) => layoutPerson(child, context));
   const childrenWidth = sumWidths(children, context.options.siblingGap);
-  const childrenHeight = children.reduce((max, child) => Math.max(max, child.height), 0);
+  const childrenHeight = children.reduce(
+    (max, child) => Math.max(max, child.height),
+    0,
+  );
   return {
     kind: "union",
     node,
@@ -555,52 +801,112 @@ function layoutUnion(node: FamilyTreeUnionNode, context: RenderContext): LayoutU
     partnerRowHeight,
     childrenWidth,
     width: Math.max(partnerRowWidth, childrenWidth, context.options.cardWidth),
-    height: partnerRowHeight + (children.length ? context.options.levelGap + childrenHeight : 0),
+    height:
+      partnerRowHeight +
+      (children.length ? context.options.levelGap + childrenHeight : 0),
   };
 }
 
-function renderPerson(layout: LayoutPerson, x: number, y: number, context: RenderContext): Point {
+function renderPerson(
+  layout: LayoutPerson,
+  x: number,
+  y: number,
+  context: RenderContext,
+): Point {
   const cardX = x + layout.width / 2 - context.options.cardWidth / 2;
   const person = context.personById.get(layout.node.personId);
-  const bottom = renderCard(person, cardX, y, context, visualKind(layout.node.incomingRelationKind, person));
+  const bottom = renderCard(
+    person,
+    cardX,
+    y,
+    context,
+    visualKind(layout.node.incomingRelationKind, person),
+  );
   if (!layout.unions.length) return bottom;
 
-  let unionX = x + (layout.width - sumWidths(layout.unions, context.options.siblingGap)) / 2;
+  let unionX =
+    x +
+    (layout.width - sumWidths(layout.unions, context.options.siblingGap)) / 2;
   const unionY = y + context.options.cardHeight + context.options.levelGap;
   for (const union of layout.unions) {
     const top = renderUnion(union, unionX, unionY, context, bottom);
-    drawConnector(bottom, top, context, unionConnectorKind(context.unionById.get(union.node.unionId)));
+    drawConnector(
+      bottom,
+      top,
+      context,
+      unionConnectorKind(context.unionById.get(union.node.unionId)),
+    );
     unionX += union.width + context.options.siblingGap;
   }
   return bottom;
 }
 
-function renderUnion(layout: LayoutUnion, x: number, y: number, context: RenderContext, anchor?: Point): Point {
+function renderUnion(
+  layout: LayoutUnion,
+  x: number,
+  y: number,
+  context: RenderContext,
+  anchor?: Point,
+): Point {
   const union = context.unionById.get(layout.node.unionId);
   const connectorKind = unionConnectorKind(union);
   let partnerX = x + layout.width / 2 - layout.partnerRowWidth / 2;
-  const unionPoint = { x: x + layout.width / 2, y: y + layout.partnerRowHeight + 22 };
+  const unionPoint = {
+    x: x + layout.width / 2,
+    y: y + layout.partnerRowHeight + 22,
+  };
 
   for (const partnerId of layout.visiblePartnerIds) {
-    const bottom = renderCard(context.personById.get(partnerId), partnerX, y, context, union?.kind === "former" ? "former-spouse" : "spouse");
+    const bottom = renderCard(
+      context.personById.get(partnerId),
+      partnerX,
+      y,
+      context,
+      union?.kind === "former" ? "former-spouse" : "spouse",
+    );
     drawConnector(bottom, unionPoint, context, connectorKind);
     partnerX += context.options.cardWidth + context.options.partnerGap;
   }
 
   if (anchor) drawConnector(anchor, unionPoint, context, connectorKind);
-  context.parts.push(`<circle cx="${round(unionPoint.x)}" cy="${round(unionPoint.y)}" r="5" fill="${attr(connectorColor(connectorKind, context))}"/>`);
+  context.parts.push(
+    `<circle cx="${round(unionPoint.x)}" cy="${round(unionPoint.y)}" r="5" fill="${attr(connectorColor(connectorKind, context))}"/>`,
+  );
 
   if (layout.children.length) {
     const horizontalY = unionPoint.y + 22;
     let childX = x + layout.width / 2 - layout.childrenWidth / 2;
     const firstCenter = childX + layout.children[0].width / 2;
-    const lastCenter = childX + layout.childrenWidth - layout.children[layout.children.length - 1].width / 2;
-    drawConnector(unionPoint, { x: unionPoint.x, y: horizontalY }, context, connectorKind);
-    context.parts.push(`<path d="M ${round(firstCenter)} ${round(horizontalY)} H ${round(lastCenter)}" fill="none" stroke="${attr(connectorColor(connectorKind, context))}" stroke-width="2" stroke-linecap="round"${dash(connectorKind)}/>`);
+    const lastCenter =
+      childX +
+      layout.childrenWidth -
+      layout.children[layout.children.length - 1].width / 2;
+    drawConnector(
+      unionPoint,
+      { x: unionPoint.x, y: horizontalY },
+      context,
+      connectorKind,
+    );
+    context.parts.push(
+      `<path d="M ${round(firstCenter)} ${round(horizontalY)} H ${round(lastCenter)}" fill="none" stroke="${attr(connectorColor(connectorKind, context))}" stroke-width="2" stroke-linecap="round"${dash(connectorKind)}/>`,
+    );
     for (const child of layout.children) {
       const childCenter = childX + child.width / 2;
-      drawConnector({ x: childCenter, y: horizontalY }, { x: childCenter, y: y + layout.partnerRowHeight + context.options.levelGap }, context, childConnectorKind(child.node.incomingRelationKind));
-      renderPerson(child, childX, y + layout.partnerRowHeight + context.options.levelGap, context);
+      drawConnector(
+        { x: childCenter, y: horizontalY },
+        {
+          x: childCenter,
+          y: y + layout.partnerRowHeight + context.options.levelGap,
+        },
+        context,
+        childConnectorKind(child.node.incomingRelationKind),
+      );
+      renderPerson(
+        child,
+        childX,
+        y + layout.partnerRowHeight + context.options.levelGap,
+        context,
+      );
       childX += child.width + context.options.siblingGap;
     }
   }
@@ -608,9 +914,25 @@ function renderUnion(layout: LayoutUnion, x: number, y: number, context: RenderC
   return unionPoint;
 }
 
-function renderCard(person: FamilyTreePerson | undefined, x: number, y: number, context: RenderContext, kind: "bloodline" | "spouse" | "former-spouse" | "adopted" | "step" | "heir" | "excluded"): Point {
+function renderCard(
+  person: FamilyTreePerson | undefined,
+  x: number,
+  y: number,
+  context: RenderContext,
+  kind:
+    | "bloodline"
+    | "spouse"
+    | "former-spouse"
+    | "adopted"
+    | "step"
+    | "heir"
+    | "excluded",
+): Point {
   const stroke = cardColor(kind, context.theme);
-  const fill = kind === "heir" ? tint(context.theme.heir, 0.94) : context.theme.cardBackground;
+  const fill =
+    kind === "heir"
+      ? tint(context.theme.heir, 0.94)
+      : context.theme.cardBackground;
   const displayName = person?.displayName ?? "Unknown";
   const dates = formatDates(person);
 
@@ -620,16 +942,33 @@ function renderCard(person: FamilyTreePerson | undefined, x: number, y: number, 
   );
 
   if (person?.nickname) {
-    context.parts.push(`<text x="${round(x + 14)}" y="${round(y + 38)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(truncate(`“${person.nickname}”`, 26))}</text>`);
+    context.parts.push(
+      `<text x="${round(x + 14)}" y="${round(y + 38)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(truncate(`“${person.nickname}”`, 26))}</text>`,
+    );
   }
   if (dates) {
-    context.parts.push(`<text x="${round(x + 14)}" y="${round(y + (person?.nickname ? 56 : 40))}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(dates)}</text>`);
+    context.parts.push(
+      `<text x="${round(x + 14)}" y="${round(y + (person?.nickname ? 56 : 40))}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(dates)}</text>`,
+    );
   }
-  renderTags(person?.tags ?? [], x + context.options.cardWidth - 12, y + 12, context);
-  return { x: x + context.options.cardWidth / 2, y: y + context.options.cardHeight };
+  renderTags(
+    person?.tags ?? [],
+    x + context.options.cardWidth - 12,
+    y + 12,
+    context,
+  );
+  return {
+    x: x + context.options.cardWidth / 2,
+    y: y + context.options.cardHeight,
+  };
 }
 
-function renderTags(tags: string[], rightX: number, y: number, context: RenderContext): void {
+function renderTags(
+  tags: string[],
+  rightX: number,
+  y: number,
+  context: RenderContext,
+): void {
   let cursorX = rightX;
   for (const tag of tags.slice(0, 3).reverse()) {
     const label = `[${tag}]`;
@@ -643,13 +982,24 @@ function renderTags(tags: string[], rightX: number, y: number, context: RenderCo
   }
 }
 
-function drawConnector(from: Point, to: Point, context: RenderContext, kind: "normal" | "former" | "adopted" | "step"): void {
+function drawConnector(
+  from: Point,
+  to: Point,
+  context: RenderContext,
+  kind: "normal" | "former" | "adopted" | "step",
+): void {
   const midY = from.y + (to.y - from.y) / 2;
   const path = `M ${round(from.x)} ${round(from.y)} C ${round(from.x)} ${round(midY)}, ${round(to.x)} ${round(midY)}, ${round(to.x)} ${round(to.y)}`;
-  context.parts.push(`<path d="${path}" fill="none" stroke="${attr(connectorColor(kind, context))}" stroke-width="2" stroke-linecap="round"${dash(kind)}/>`);
+  context.parts.push(
+    `<path d="${path}" fill="none" stroke="${attr(connectorColor(kind, context))}" stroke-width="2" stroke-linecap="round"${dash(kind)}/>`,
+  );
 }
 
-function renderLegend(centerX: number, y: number, context: RenderContext): void {
+function renderLegend(
+  centerX: number,
+  y: number,
+  context: RenderContext,
+): void {
   const items: Array<[string, string]> = [
     ["Asıl soy", context.theme.bloodline],
     ["Eş", context.theme.spouse],
@@ -668,8 +1018,12 @@ function renderLegend(centerX: number, y: number, context: RenderContext): void 
   }
 }
 
-function visualKind(kind: FamilyTreeRelationKind, person?: FamilyTreePerson): "bloodline" | "adopted" | "step" | "heir" | "excluded" {
-  if (person?.tags.includes("x") || person?.tags.includes("red")) return "excluded";
+function visualKind(
+  kind: FamilyTreeRelationKind,
+  person?: FamilyTreePerson,
+): "bloodline" | "adopted" | "step" | "heir" | "excluded" {
+  if (person?.tags.includes("x") || person?.tags.includes("red"))
+    return "excluded";
   if (person?.tags.includes("v")) return "heir";
   if (kind === "adopted") return "adopted";
   if (kind === "step") return "step";
@@ -680,13 +1034,25 @@ function unionConnectorKind(union?: FamilyTreeUnion): "normal" | "former" {
   return union?.kind === "former" ? "former" : "normal";
 }
 
-function childConnectorKind(kind: FamilyTreeRelationKind): "normal" | "adopted" | "step" {
+function childConnectorKind(
+  kind: FamilyTreeRelationKind,
+): "normal" | "adopted" | "step" {
   if (kind === "adopted") return "adopted";
   if (kind === "step") return "step";
   return "normal";
 }
 
-function cardColor(kind: "bloodline" | "spouse" | "former-spouse" | "adopted" | "step" | "heir" | "excluded", theme: FamilyTreeTheme): string {
+function cardColor(
+  kind:
+    | "bloodline"
+    | "spouse"
+    | "former-spouse"
+    | "adopted"
+    | "step"
+    | "heir"
+    | "excluded",
+  theme: FamilyTreeTheme,
+): string {
   if (kind === "spouse") return theme.spouse;
   if (kind === "former-spouse") return theme.formerSpouse;
   if (kind === "adopted") return theme.adopted;
@@ -696,7 +1062,10 @@ function cardColor(kind: "bloodline" | "spouse" | "former-spouse" | "adopted" | 
   return theme.bloodline;
 }
 
-function connectorColor(kind: "normal" | "former" | "adopted" | "step", context: RenderContext): string {
+function connectorColor(
+  kind: "normal" | "former" | "adopted" | "step",
+  context: RenderContext,
+): string {
   if (kind === "former") return context.theme.formerSpouse;
   if (kind === "adopted") return context.theme.adopted;
   if (kind === "step") return context.theme.step;
@@ -716,15 +1085,25 @@ function dash(kind: "normal" | "former" | "adopted" | "step"): string {
 
 function formatDates(person?: FamilyTreePerson): string | undefined {
   if (!person?.birthDate && !person?.deathDate) return undefined;
-  if (person.birthDate && person.deathDate) return `${person.birthDate} – ${person.deathDate}`;
+  if (person.birthDate && person.deathDate)
+    return `${person.birthDate} – ${person.deathDate}`;
   return person.birthDate ?? `† ${person.deathDate}`;
 }
 
 function sumWidths(items: Size[], gap: number): number {
-  return items.length ? items.reduce((total, item) => total + item.width, 0) + (items.length - 1) * gap : 0;
+  return items.length
+    ? items.reduce((total, item) => total + item.width, 0) +
+        (items.length - 1) * gap
+    : 0;
 }
 
-function issue(line: number, column: number, severity: FamilyTreeIssueSeverity, code: string, message: string): FamilyTreeIssue {
+function issue(
+  line: number,
+  column: number,
+  severity: FamilyTreeIssueSeverity,
+  code: string,
+  message: string,
+): FamilyTreeIssue {
   return { line, column, severity, code, message };
 }
 
@@ -733,16 +1112,20 @@ function normalize(value: string): string {
 }
 
 function slug(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "") || "person";
+  return (
+    value
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "person"
+  );
 }
 
 function truncate(value: string, maxLength: number): string {
-  return value.length <= maxLength ? value : `${value.slice(0, Math.max(0, maxLength - 1))}…`;
+  return value.length <= maxLength
+    ? value
+    : `${value.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
 function isSpace(value: string | undefined): boolean {
@@ -750,7 +1133,10 @@ function isSpace(value: string | undefined): boolean {
 }
 
 function text(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function attr(value: string): string {
@@ -767,6 +1153,10 @@ function tint(color: string, amount: number): string {
   const green = Number.parseInt(color.slice(3, 5), 16);
   const blue = Number.parseInt(color.slice(5, 7), 16);
   return `#${[red, green, blue]
-    .map((channel) => Math.round(channel + (255 - channel) * amount).toString(16).padStart(2, "0"))
+    .map((channel) =>
+      Math.round(channel + (255 - channel) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("")}`;
 }

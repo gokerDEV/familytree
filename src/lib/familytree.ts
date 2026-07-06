@@ -968,6 +968,7 @@ function layoutPerson(
   );
 
   const subtreeWidth = Math.max(spouseRowWidth, unionsSubtreeWidth);
+  const anchorCardXOffset = Math.max(0, (subtreeWidth - spouseRowWidth) / 2);
   const unionHeight = unions.reduce(
     (max, union) => Math.max(max, union.height),
     0,
@@ -979,8 +980,8 @@ function layoutPerson(
     unions,
     width: subtreeWidth,
     height: Math.max(context.options.cardHeight, unionHeight),
-    anchorCardXOffset: 0,
-    anchorCenterOffset: context.options.cardWidth / 2,
+    anchorCardXOffset,
+    anchorCenterOffset: anchorCardXOffset + context.options.cardWidth / 2,
     spouseRowWidth,
     subtreeWidth,
     hasPartnerUnions,
@@ -1042,10 +1043,16 @@ function renderPerson(
   );
   if (!layout.unions.length) return anchorBottom;
 
+  const unionsSubtreeWidth = sumWidths(
+    layout.unions.map((u) => ({ width: u.subtreeWidth, height: 0 })),
+    context.options.siblingGap,
+  );
+
   let currentPartnerX = layout.hasPartnerUnions
     ? cardX + context.options.cardWidth + context.options.partnerGap
     : x;
-  let currentChildX = x;
+  let currentChildX =
+    x + Math.max(0, (layout.subtreeWidth - unionsSubtreeWidth) / 2);
 
   for (const union of layout.unions) {
     renderUnion(

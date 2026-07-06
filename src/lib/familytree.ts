@@ -84,6 +84,7 @@ export type FamilyTreeTheme = {
 };
 
 export type FamilyTreeLineStyle = "solid" | "dashed" | "dotted";
+export type FamilyTreeConnectorShape = "curved" | "elbow";
 
 export type FamilyTreeVisualRule = {
   label: string;
@@ -111,11 +112,14 @@ export type FamilyTreeVisualConfig = {
   deceased: {
     desaturate: number;
   };
+  connectors: {
+    shape: FamilyTreeConnectorShape;
+  };
 };
 
 export type FamilyTreeRenderOptions = FamilyTreeParseOptions & {
   theme?: Partial<FamilyTreeTheme>;
-  visualConfig?: FamilyTreeVisualConfig;
+  visualConfig?: Partial<FamilyTreeVisualConfig>;
   cardWidth?: number;
   cardHeight?: number;
   levelGap?: number;
@@ -207,54 +211,97 @@ export const DEFAULT_FAMILY_TREE_VISUAL_CONFIG: FamilyTreeVisualConfig = {
   deceased: {
     desaturate: 50,
   },
+  connectors: {
+    shape: "curved",
+  },
 };
 
 export function mergeFamilyTreeVisualConfig(
   stored?: Partial<FamilyTreeVisualConfig>,
 ): FamilyTreeVisualConfig {
-  if (!stored) return DEFAULT_FAMILY_TREE_VISUAL_CONFIG;
   return {
     relations: {
-      ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations,
-      ...(stored.relations || {}),
+      biological: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations.biological,
+        ...stored?.relations?.biological,
+      },
+      spouse: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations.spouse,
+        ...stored?.relations?.spouse,
+      },
+      formerSpouse: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations.formerSpouse,
+        ...stored?.relations?.formerSpouse,
+      },
+      adopted: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations.adopted,
+        ...stored?.relations?.adopted,
+      },
+      step: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.relations.step,
+        ...stored?.relations?.step,
+      },
     },
     statuses: {
-      ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses,
-      ...(stored.statuses || {}),
+      heir: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses.heir,
+        ...stored?.statuses?.heir,
+      },
+      inheritance: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses.inheritance,
+        ...stored?.statuses?.inheritance,
+      },
+      excluded: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses.excluded,
+        ...stored?.statuses?.excluded,
+      },
+      renounced: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses.renounced,
+        ...stored?.statuses?.renounced,
+      },
+      will: {
+        ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.statuses.will,
+        ...stored?.statuses?.will,
+      },
     },
     deceased: {
       ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.deceased,
-      ...(stored.deceased || {}),
+      ...stored?.deceased,
+    },
+    connectors: {
+      ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.connectors,
+      ...stored?.connectors,
     },
   };
 }
 
 export const DEFAULT_FAMILY_TREE_EXAMPLE = `# Yılmaz Krallığı / Ailesi
 
-- Ahmet Yılmaz @ahmet1945 "Kral Ahmet" (1945) + Ayşe Yılmaz @ayse1948 "Kraliçe Ayşe" (1948)
-  - Mehmet Yılmaz @mehmet1972 "Büyük Oğul" (1972)
-    - x+ Fatma Demir @fatma1974 (1974)
-      - Ali Yılmaz @ali1998 (1998)
-      - Elif Yılmaz @elif2001 [v] (2001)
-      - a+ Ece Yılmaz @ece2004 (2004)
-    - + Sema Kaya @sema1978 (1978)
-      - ~ Bora Kaya @bora2005 (2005) {Sema'nın önceki evliliğinden çocuğu}
+- Ahmet Yılmaz @ahmet1945 "Kral Ahmet" (1945)
+  - + Ayşe Yılmaz @ayse1948 "Kraliçe Ayşe" (1948)
+    - Mehmet Yılmaz @mehmet1972 "Büyük Oğul" (1972)
+      - x+ Fatma Demir @fatma1974 (1974)
+        - Ali Yılmaz @ali1998 (1998)
+        - Elif Yılmaz @elif2001 [v] (2001)
+        - a+ Ece Yılmaz @ece2004 (2004)
+      - + Sema Kaya @sema1978 (1978)
+        - ~ Bora Kaya @bora2005 (2005) {Sema'nın önceki evliliğinden çocuğu}
 
-  - Zeynep Yılmaz @zeynep1975 [v] (1975)
-    - x+ Kemal Arslan @kemal1973 (1973)
-      - Mert Arslan @mert1999 (1999)
-      - Deniz Arslan @deniz2002 (2002)
-      - a+ Ekin Arslan @ekin2006 (2006)
-    - + Murat Çelik @murat1977 (1977)
-      - ~ Lara Çelik @lara2008 (2008) {Murat'ın önceki evliliğinden çocuğu}
+    - Zeynep Yılmaz @zeynep1975 [v] (1975)
+      - x+ Kemal Arslan @kemal1973 (1973)
+        - Mert Arslan @mert1999 (1999)
+        - Deniz Arslan @deniz2002 (2002)
+        - a+ Ekin Arslan @ekin2006 (2006)
+      - + Murat Çelik @murat1977 (1977)
+        - ~ Lara Çelik @lara2008 (2008) {Murat'ın önceki evliliğinden çocuğu}
 
-  - a+ Cem Yılmaz @cem1980 (1980)
-    - x+ Derya Koç @derya1982 (1982)
-      - Okan Yılmaz @okan2007 (2007)
-      - Selin Yılmaz @selin2010 (2010)
-      - a+ Ada Yılmaz @ada2013 (2013)
-    - + Nehir Aydın @nehir1985 (1985)
-      - ~ Tuna Aydın @tuna2011 (2011) {Nehir'in önceki evliliğinden çocuğu}`;
+    - a+ Cem Yılmaz @cem1980 (1980)
+      - x+ Derya Koç @derya1982 (1982)
+        - Okan Yılmaz @okan2007 (2007)
+        - Selin Yılmaz @selin2010 (2010)
+        - a+ Ada Yılmaz @ada2013 (2013)
+      - + Nehir Aydın @nehir1985 (1985)
+        - ~ Tuna Aydın @tuna2011 (2011) {Nehir'in önceki evliliğinden çocuğu}`;
 
 type MutableDocument = {
   title?: string;
@@ -265,6 +312,7 @@ type MutableDocument = {
 };
 
 type StackEntry = { level: number; node: FamilyTreeRootNode };
+
 type ParsedItem = {
   kind: "person" | "spouse";
   personText: string;
@@ -277,18 +325,22 @@ type ParsedItem = {
 type PersonDraft = Omit<FamilyTreePerson, "id"> & { explicitId?: string };
 type Size = { width: number; height: number };
 type Point = { x: number; y: number };
+
 type LayoutPerson = Size & {
   kind: "person";
   node: FamilyTreePersonNode;
   unions: LayoutUnion[];
+  anchorOffset: number;
+  unionsWidth: number;
+  hasPartnerUnions: boolean;
 };
+
 type LayoutUnion = Size & {
   kind: "union";
   node: FamilyTreeUnionNode;
   visiblePartnerIds: string[];
   children: LayoutPerson[];
   partnerRowWidth: number;
-  partnerRowHeight: number;
   childrenWidth: number;
 };
 
@@ -446,13 +498,20 @@ export function parseFamilyTree(
         const partner = getOrCreatePerson(document, partnerDraft);
 
         if (!parent) {
+          const personNode = createPersonNode(
+            person.id,
+            line,
+            parsedItem.relationKind,
+          );
           const unionNode = createUnion(
             document,
             parsedItem.unionKind ?? "current",
             [person.id, partner.id],
             line,
+            person.id,
           );
-          document.roots.push(unionNode);
+          personNode.unions.push(unionNode);
+          document.roots.push(personNode);
           stack.push({ level, node: unionNode });
           return;
         }
@@ -577,8 +636,9 @@ export function renderFamilyTreeSvg(
     cursorX += root.width + context.options.siblingGap;
   }
 
-  if (context.options.showLegend)
+  if (context.options.showLegend) {
     renderLegend(width / 2, height - context.options.padding - 10, context);
+  }
   context.parts.push("</svg>");
   return context.parts.join("");
 }
@@ -595,7 +655,7 @@ function parseItem(
     );
     return undefined;
   }
-  if (content.startsWith("x+ "))
+  if (content.startsWith("x+ ")) {
     return {
       kind: "spouse",
       personText: content.slice(3).trim(),
@@ -603,7 +663,8 @@ function parseItem(
       unionKind: "former",
       column,
     };
-  if (content.startsWith("+ "))
+  }
+  if (content.startsWith("+ ")) {
     return {
       kind: "spouse",
       personText: content.slice(2).trim(),
@@ -611,6 +672,7 @@ function parseItem(
       unionKind: "current",
       column,
     };
+  }
 
   let relationKind: FamilyTreeRelationKind = "biological";
   let personText = content;
@@ -643,13 +705,7 @@ function parsePerson(
   let value = raw.trim();
   if (!value) {
     issues.push(
-      issue(
-        line,
-        column,
-        "error",
-        "empty-person",
-        "Person definition cannot be empty.",
-      ),
+      issue(line, column, "error", "empty-person", "Person definition cannot be empty."),
     );
     return undefined;
   }
@@ -726,11 +782,12 @@ function parseDateBlock(value?: string): {
   const yearRange = normalized.match(/^(\d{4})-(\d{4})$/);
   if (yearRange) return { birthDate: yearRange[1], deathDate: yearRange[2] };
   const spacedRange = normalized.match(/^(.+?)\s+-\s+(.+)$/);
-  if (spacedRange)
+  if (spacedRange) {
     return {
       birthDate: spacedRange[1]?.trim(),
       deathDate: spacedRange[2]?.trim(),
     };
+  }
   return { birthDate: normalized };
 }
 
@@ -846,15 +903,17 @@ function findInlineOperator(
       value[index + 1] === "+" &&
       isSpace(value[index - 1]) &&
       isSpace(value[index + 2])
-    )
+    ) {
       return { index, operator: "x+" };
+    }
     if (
       char === "+" &&
       isSpace(value[index - 1]) &&
       isSpace(value[index + 1]) &&
       value[index - 1] !== "x"
-    )
+    ) {
       return { index, operator: "+" };
+    }
   }
   return undefined;
 }
@@ -864,25 +923,44 @@ function layoutPerson(
   context: RenderContext,
 ): LayoutPerson {
   const unions = node.unions.map((union) => layoutUnion(union, context));
-  if (!unions.length)
+  if (!unions.length) {
     return {
       kind: "person",
       node,
       unions,
       width: context.options.cardWidth,
       height: context.options.cardHeight,
+      anchorOffset: 0,
+      unionsWidth: 0,
+      hasPartnerUnions: false,
     };
-  const unionWidth = sumWidths(unions, context.options.siblingGap);
+  }
+
+  const unionsWidth = sumWidths(unions, context.options.siblingGap);
+  const hasPartnerUnions = unions.some(
+    (union) => union.visiblePartnerIds.length > 0,
+  );
+  const rowWidth = hasPartnerUnions
+    ? context.options.cardWidth + context.options.partnerGap + unionsWidth
+    : unionsWidth;
+  const width = Math.max(context.options.cardWidth, rowWidth);
+  const anchorOffset = hasPartnerUnions
+    ? 0
+    : Math.max(0, (width - context.options.cardWidth) / 2);
   const unionHeight = unions.reduce(
     (max, union) => Math.max(max, union.height),
     0,
   );
+
   return {
     kind: "person",
     node,
     unions,
-    width: Math.max(context.options.cardWidth, unionWidth),
-    height: context.options.cardHeight + context.options.levelGap + unionHeight,
+    width,
+    height: Math.max(context.options.cardHeight, unionHeight),
+    anchorOffset,
+    unionsWidth,
+    hasPartnerUnions,
   };
 }
 
@@ -894,14 +972,10 @@ function layoutUnion(
   const visiblePartnerIds = union
     ? union.partnerIds.filter((id) => id !== union.anchorPersonId)
     : [];
-  const partnerCount = Math.max(visiblePartnerIds.length, 1);
   const partnerRowWidth = visiblePartnerIds.length
-    ? partnerCount * context.options.cardWidth +
-      (partnerCount - 1) * context.options.partnerGap
-    : 24;
-  const partnerRowHeight = visiblePartnerIds.length
-    ? context.options.cardHeight
-    : 24;
+    ? visiblePartnerIds.length * context.options.cardWidth +
+      (visiblePartnerIds.length - 1) * context.options.partnerGap
+    : 0;
   const children = node.children.map((child) => layoutPerson(child, context));
   const childrenWidth = sumWidths(children, context.options.siblingGap);
   const childrenHeight = children.reduce(
@@ -914,11 +988,10 @@ function layoutUnion(
     visiblePartnerIds,
     children,
     partnerRowWidth,
-    partnerRowHeight,
     childrenWidth,
     width: Math.max(partnerRowWidth, childrenWidth, context.options.cardWidth),
     height:
-      partnerRowHeight +
+      context.options.cardHeight +
       (children.length ? context.options.levelGap + childrenHeight : 0),
   };
 }
@@ -929,30 +1002,26 @@ function renderPerson(
   y: number,
   context: RenderContext,
 ): Point {
-  const cardX = x + layout.width / 2 - context.options.cardWidth / 2;
+  const cardX = x + layout.anchorOffset;
   const person = context.personById.get(layout.node.personId);
-  const bottom = renderCard(
+  const anchorBottom = renderCard(
     person,
     cardX,
     y,
     context,
     layout.node.incomingRelationKind,
   );
-  if (!layout.unions.length) return bottom;
+  if (!layout.unions.length) return anchorBottom;
 
-  let unionX =
-    x +
-    (layout.width - sumWidths(layout.unions, context.options.siblingGap)) / 2;
-  const unionY = y + context.options.cardHeight + context.options.levelGap;
+  let unionX = layout.hasPartnerUnions
+    ? cardX + context.options.cardWidth + context.options.partnerGap
+    : x + (layout.width - layout.unionsWidth) / 2;
+
   for (const union of layout.unions) {
-    const top = renderUnion(union, unionX, unionY, context, bottom);
-    const unionData = context.unionById.get(union.node.unionId);
-    const relationType =
-      unionData?.kind === "former" ? "formerSpouse" : "spouse";
-    drawConnector(bottom, top, context, relationType);
+    renderUnion(union, unionX, y, context, anchorBottom);
     unionX += union.width + context.options.siblingGap;
   }
-  return bottom;
+  return anchorBottom;
 }
 
 function renderUnion(
@@ -964,11 +1033,10 @@ function renderUnion(
 ): Point {
   const union = context.unionById.get(layout.node.unionId);
   const relationType = union?.kind === "former" ? "formerSpouse" : "spouse";
-  let partnerX = x + layout.width / 2 - layout.partnerRowWidth / 2;
-  const unionPoint = {
-    x: x + layout.width / 2,
-    y: y + layout.partnerRowHeight + 22,
-  };
+  const relationRule = context.visualConfig.relations[relationType];
+  const partnerStartX = x + (layout.width - layout.partnerRowWidth) / 2;
+  let partnerX = partnerStartX;
+  const partnerBottoms: Point[] = [];
 
   for (const partnerId of layout.visiblePartnerIds) {
     const bottom = renderCard(
@@ -978,24 +1046,37 @@ function renderUnion(
       context,
       relationType,
     );
-    drawConnector(bottom, unionPoint, context, relationType);
+    partnerBottoms.push(bottom);
     partnerX += context.options.cardWidth + context.options.partnerGap;
   }
 
+  const partnerCenter = partnerBottoms.length
+    ? average(partnerBottoms.map((point) => point.x))
+    : x + layout.width / 2;
+  const unionPoint = {
+    x: anchor ? partnerCenter : x + layout.width / 2,
+    y: y + context.options.cardHeight + 26,
+  };
+
+  for (const bottom of partnerBottoms) {
+    drawConnector(bottom, unionPoint, context, relationType);
+  }
   if (anchor) drawConnector(anchor, unionPoint, context, relationType);
-  const relationRule = context.visualConfig.relations[relationType];
+
   context.parts.push(
     `<circle cx="${round(unionPoint.x)}" cy="${round(unionPoint.y)}" r="5" fill="${attr(relationRule.color)}"/>`,
   );
 
   if (layout.children.length) {
     const horizontalY = unionPoint.y + 22;
-    let childX = x + layout.width / 2 - layout.childrenWidth / 2;
+    const childY = y + context.options.cardHeight + context.options.levelGap;
+    let childX = x + (layout.width - layout.childrenWidth) / 2;
     const firstCenter = childX + layout.children[0].width / 2;
     const lastCenter =
       childX +
       layout.childrenWidth -
       layout.children[layout.children.length - 1].width / 2;
+
     drawConnector(
       unionPoint,
       { x: unionPoint.x, y: horizontalY },
@@ -1005,23 +1086,16 @@ function renderUnion(
     context.parts.push(
       `<path d="M ${round(firstCenter)} ${round(horizontalY)} H ${round(lastCenter)}" fill="none" stroke="${attr(relationRule.color)}" stroke-width="2" stroke-linecap="round"${dash(relationRule.lineStyle)}/>`,
     );
+
     for (const child of layout.children) {
       const childCenter = childX + child.width / 2;
       drawConnector(
         { x: childCenter, y: horizontalY },
-        {
-          x: childCenter,
-          y: y + layout.partnerRowHeight + context.options.levelGap,
-        },
+        { x: childCenter, y: childY },
         context,
         child.node.incomingRelationKind,
       );
-      renderPerson(
-        child,
-        childX,
-        y + layout.partnerRowHeight + context.options.levelGap,
-        context,
-      );
+      renderPerson(child, childX, childY, context);
       childX += child.width + context.options.siblingGap;
     }
   }
@@ -1041,12 +1115,11 @@ function renderCard(
     incomingRelation,
     context.visualConfig,
   );
-  const fill = context.theme.cardBackground;
   const displayName = person?.displayName ?? "Unknown";
   const dates = formatDates(person);
 
   context.parts.push(
-    `<rect x="${round(x)}" y="${round(y)}" width="${context.options.cardWidth}" height="${context.options.cardHeight}" rx="14" fill="${attr(fill)}" stroke="${attr(visual.borderColor)}" stroke-width="2"/>`,
+    `<rect x="${round(x)}" y="${round(y)}" width="${context.options.cardWidth}" height="${context.options.cardHeight}" rx="14" fill="${attr(context.theme.cardBackground)}" stroke="${attr(visual.borderColor)}" stroke-width="2"/>`,
     `<text x="${round(x + 14)}" y="${round(y + 20)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="${attr(context.theme.text)}">${text(truncate(displayName, 24))}</text>`,
   );
 
@@ -1078,26 +1151,8 @@ function resolvePersonVisual(
   config: FamilyTreeVisualConfig,
 ) {
   const relationRule = config.relations[incomingRelation];
-  let highestStatusColor: string | undefined;
-
-  if (person?.tags) {
-    // Check status overrides in priority
-    if (person.tags.includes("v") && config.statuses.heir.visible)
-      highestStatusColor = config.statuses.heir.color;
-    else if (
-      person.tags.some((t) => t.startsWith("m")) &&
-      config.statuses.inheritance.visible
-    )
-      highestStatusColor = config.statuses.inheritance.color;
-    else if (person.tags.includes("x") && config.statuses.excluded.visible)
-      highestStatusColor = config.statuses.excluded.color;
-    else if (person.tags.includes("red") && config.statuses.renounced.visible)
-      highestStatusColor = config.statuses.renounced.color;
-    else if (person.tags.includes("will") && config.statuses.will.visible)
-      highestStatusColor = config.statuses.will.color;
-  }
-
-  const baseColor = highestStatusColor ?? relationRule.color;
+  const statusColor = findVisibleStatusColor(person?.tags ?? [], config);
+  const baseColor = statusColor ?? relationRule.color;
   const isDeceased = !!person?.deathDate;
 
   return {
@@ -1116,17 +1171,11 @@ function renderTags(
 ): void {
   let cursorX = rightX;
   for (const tag of tags.slice(0, 3).reverse()) {
+    const color = findStatusColor(tag, context.visualConfig);
+    if (!color) continue;
     const label = `[${tag}]`;
     const width = Math.max(24, label.length * 7 + 10);
     cursorX -= width;
-    let color = context.theme.mutedText;
-    if (tag === "v") color = context.visualConfig.statuses.heir.color;
-    else if (tag.startsWith("m"))
-      color = context.visualConfig.statuses.inheritance.color;
-    else if (tag === "x") color = context.visualConfig.statuses.excluded.color;
-    else if (tag === "red")
-      color = context.visualConfig.statuses.renounced.color;
-    else if (tag === "will") color = context.visualConfig.statuses.will.color;
 
     context.parts.push(
       `<rect x="${round(cursorX)}" y="${round(y)}" width="${round(width)}" height="18" rx="9" fill="${attr(color)}"/>`,
@@ -1143,10 +1192,12 @@ function drawConnector(
   relationType: keyof FamilyTreeVisualConfig["relations"],
 ): void {
   const rule = context.visualConfig.relations[relationType];
-  const midY = from.y + (to.y - from.y) / 2;
-  const path = `M ${round(from.x)} ${round(from.y)} C ${round(from.x)} ${round(midY)}, ${round(to.x)} ${round(midY)}, ${round(to.x)} ${round(to.y)}`;
+  const path =
+    context.visualConfig.connectors.shape === "elbow"
+      ? elbowPath(from, to)
+      : curvedPath(from, to);
   context.parts.push(
-    `<path d="${path}" fill="none" stroke="${attr(rule.color)}" stroke-width="2" stroke-linecap="round"${dash(rule.lineStyle)}/>`,
+    `<path d="${path}" fill="none" stroke="${attr(rule.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dash(rule.lineStyle)}/>`,
   );
 }
 
@@ -1168,16 +1219,63 @@ function renderLegend(
   }
 }
 
+function curvedPath(from: Point, to: Point): string {
+  const midY = from.y + (to.y - from.y) / 2;
+  return `M ${round(from.x)} ${round(from.y)} C ${round(from.x)} ${round(midY)}, ${round(to.x)} ${round(midY)}, ${round(to.x)} ${round(to.y)}`;
+}
+
+function elbowPath(from: Point, to: Point): string {
+  if (Math.abs(from.x - to.x) < 0.5 || Math.abs(from.y - to.y) < 0.5) {
+    return `M ${round(from.x)} ${round(from.y)} L ${round(to.x)} ${round(to.y)}`;
+  }
+  const midY = from.y + (to.y - from.y) / 2;
+  return `M ${round(from.x)} ${round(from.y)} V ${round(midY)} H ${round(to.x)} V ${round(to.y)}`;
+}
+
 function dash(lineStyle: FamilyTreeLineStyle): string {
   if (lineStyle === "dashed") return ' stroke-dasharray="6 5"';
   if (lineStyle === "dotted") return ' stroke-dasharray="2 4"';
   return "";
 }
 
+function findVisibleStatusColor(
+  tags: string[],
+  config: FamilyTreeVisualConfig,
+): string | undefined {
+  for (const tag of tags) {
+    const color = findStatusColor(tag, config);
+    if (color) return color;
+  }
+  return undefined;
+}
+
+function findStatusColor(
+  tag: string,
+  config: FamilyTreeVisualConfig,
+): string | undefined {
+  if (tag === "v" && config.statuses.heir.visible) {
+    return config.statuses.heir.color;
+  }
+  if (tag.startsWith("m") && config.statuses.inheritance.visible) {
+    return config.statuses.inheritance.color;
+  }
+  if (tag === "x" && config.statuses.excluded.visible) {
+    return config.statuses.excluded.color;
+  }
+  if (tag === "red" && config.statuses.renounced.visible) {
+    return config.statuses.renounced.color;
+  }
+  if (tag === "will" && config.statuses.will.visible) {
+    return config.statuses.will.color;
+  }
+  return undefined;
+}
+
 function formatDates(person?: FamilyTreePerson): string | undefined {
   if (!person?.birthDate && !person?.deathDate) return undefined;
-  if (person.birthDate && person.deathDate)
+  if (person.birthDate && person.deathDate) {
     return `${person.birthDate} – ${person.deathDate}`;
+  }
   return person.birthDate ?? `† ${person.deathDate}`;
 }
 
@@ -1186,6 +1284,11 @@ function sumWidths(items: Size[], gap: number): number {
     ? items.reduce((total, item) => total + item.width, 0) +
         (items.length - 1) * gap
     : 0;
+}
+
+function average(values: number[]): number {
+  if (!values.length) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function issue(
@@ -1244,14 +1347,11 @@ function desaturateHexColor(hex: string, amount: number): string {
   const r = Number.parseInt(hex.slice(1, 3), 16);
   const g = Number.parseInt(hex.slice(3, 5), 16);
   const b = Number.parseInt(hex.slice(5, 7), 16);
-
-  // Calculate relative luminance
-  const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   const desaturateFactor = Math.min(100, Math.max(0, amount)) / 100;
-
-  const nr = Math.round(r + (l - r) * desaturateFactor);
-  const ng = Math.round(g + (l - g) * desaturateFactor);
-  const nb = Math.round(b + (l - b) * desaturateFactor);
+  const nr = Math.round(r + (luminance - r) * desaturateFactor);
+  const ng = Math.round(g + (luminance - g) * desaturateFactor);
+  const nb = Math.round(b + (luminance - b) * desaturateFactor);
 
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }

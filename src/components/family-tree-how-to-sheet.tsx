@@ -88,7 +88,7 @@ export function FamilyTreeHowToSheet({
       </SheetTrigger>
       <SheetContent
         side="left"
-        className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0"
+        className="w-[85vw] data-[side=left]:max-w-full! data-[side=left]:w-xl flex flex-col gap-0 p-0"
       >
         <SheetHeader className="p-6 pb-2 text-left">
           <SheetTitle>Documentation & Config</SheetTitle>
@@ -96,7 +96,7 @@ export function FamilyTreeHowToSheet({
             How to use and customize.
           </SheetDescription>
         </SheetHeader>
-        <ScrollArea className="flex-1 p-6 pt-4">
+        <ScrollArea className="flex-1 min-h-0 p-6 pt-4">
           <div className="flex flex-col gap-6">
             <div className="space-y-3">
               <h3 className="font-medium text-sm">Notation Guide</h3>

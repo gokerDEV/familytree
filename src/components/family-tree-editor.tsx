@@ -20,10 +20,14 @@ const FAMILY_TREE_VISUAL_CONFIG_STORAGE_KEY = "familytree.visual-config.v1";
 
 export function FamilyTreeEditor() {
   const [source, setSource] = useState(DEFAULT_FAMILY_TREE_EXAMPLE);
+  const [originalSource, setOriginalSource] = useState(DEFAULT_FAMILY_TREE_EXAMPLE);
+  const [activeSample, setActiveSample] = useState("custom");
   const [visualConfig, setVisualConfig] = useState<FamilyTreeVisualConfig>(() =>
     mergeFamilyTreeVisualConfig(),
   );
   const [isMounted, setIsMounted] = useState(false);
+
+  const isDirty = activeSample !== "custom" && source !== originalSource;
 
   useEffect(() => {
     setIsMounted(true);
@@ -34,6 +38,21 @@ export function FamilyTreeEditor() {
       } catch (e) {
         console.error("Failed to parse stored visual config", e);
       }
+    }
+
+    const storedSample = localStorage.getItem("familytree.activeSample") || "custom";
+    setActiveSample(storedSample);
+    
+    const storedSource = localStorage.getItem("familytree.source") || 
+                         localStorage.getItem("familytree.custom.source") || 
+                         DEFAULT_FAMILY_TREE_EXAMPLE;
+    setSource(storedSource);
+
+    if (storedSample !== "custom") {
+      fetch(`/samples/${storedSample}.ftmd`)
+        .then((res) => res.text())
+        .then((text) => setOriginalSource(text))
+        .catch(console.error);
     }
   }, []);
 
@@ -50,6 +69,38 @@ export function FamilyTreeEditor() {
     setVisualConfig(mergeFamilyTreeVisualConfig());
   };
 
+  const handleSourceChange = (val: string) => {
+    setSource(val);
+    localStorage.setItem("familytree.source", val);
+    if (activeSample === "custom") {
+      localStorage.setItem("familytree.custom.source", val);
+    }
+  };
+
+  const handleSelectSample = async (sampleId: string) => {
+    if (sampleId === "custom") {
+      const customSource = localStorage.getItem("familytree.custom.source");
+      setSource(customSource || DEFAULT_FAMILY_TREE_EXAMPLE);
+      setActiveSample("custom");
+      localStorage.setItem("familytree.activeSample", "custom");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/samples/${sampleId}.ftmd`);
+      if (res.ok) {
+        const text = await res.text();
+        setSource(text);
+        setOriginalSource(text);
+        setActiveSample(sampleId);
+        localStorage.setItem("familytree.activeSample", sampleId);
+        localStorage.setItem("familytree.source", text);
+      }
+    } catch (e) {
+      console.error("Failed to load sample", e);
+    }
+  };
+
   if (!isMounted) return null;
 
   return (
@@ -58,6 +109,9 @@ export function FamilyTreeEditor() {
         visualConfig={visualConfig}
         setVisualConfig={setVisualConfig}
         onResetConfig={handleResetConfig}
+        activeSample={activeSample}
+        onSelectSample={handleSelectSample}
+        isDirty={isDirty}
       />
 
       <div className="flex-1 overflow-hidden w-full">
@@ -72,7 +126,7 @@ export function FamilyTreeEditor() {
                 value={source}
                 height="100%"
                 extensions={[markdown()]}
-                onChange={setSource}
+                onChange={handleSourceChange}
                 className="absolute inset-0"
               />
             </div>

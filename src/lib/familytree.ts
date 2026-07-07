@@ -115,6 +115,7 @@ export type FamilyTreeVisualConfig = {
   connectors: {
     shape: FamilyTreeConnectorShape;
   };
+  cardTemplateId: string;
 };
 
 export type FamilyTreeRenderOptions = FamilyTreeParseOptions & {
@@ -128,6 +129,7 @@ export type FamilyTreeRenderOptions = FamilyTreeParseOptions & {
   padding?: number;
   showLegend?: boolean;
   title?: string;
+  cardTemplateSvg?: string | null;
 };
 
 export const DEFAULT_FAMILY_TREE_THEME: FamilyTreeTheme = {
@@ -214,6 +216,7 @@ export const DEFAULT_FAMILY_TREE_VISUAL_CONFIG: FamilyTreeVisualConfig = {
   connectors: {
     shape: "curved",
   },
+  cardTemplateId: "default",
 };
 
 export function mergeFamilyTreeVisualConfig(
@@ -272,6 +275,7 @@ export function mergeFamilyTreeVisualConfig(
       ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.connectors,
       ...stored?.connectors,
     },
+    cardTemplateId: stored?.cardTemplateId || DEFAULT_FAMILY_TREE_VISUAL_CONFIG.cardTemplateId,
   };
 }
 
@@ -588,13 +592,26 @@ export function renderFamilyTreeSvg(
   const document = "document" in input ? input.document : input;
   const theme = { ...DEFAULT_FAMILY_TREE_THEME, ...options.theme };
   const visualConfig = mergeFamilyTreeVisualConfig(options.visualConfig);
+
+  let cardWidth = options.cardWidth ?? 188;
+  let cardHeight = options.cardHeight ?? 76;
+
+  if (options.cardTemplateSvg) {
+    const templateMatch = options.cardTemplateSvg.match(/viewBox="[^"]* ([^" ]+) ([^" ]+)"/);
+    if (templateMatch) {
+      cardWidth = parseFloat(templateMatch[1]);
+      cardHeight = parseFloat(templateMatch[2]);
+    }
+  }
+
   const context: RenderContext = {
     document,
     personById: new Map(document.persons.map((person) => [person.id, person])),
     unionById: new Map(document.unions.map((union) => [union.id, union])),
     options: {
-      cardWidth: options.cardWidth ?? 188,
-      cardHeight: options.cardHeight ?? 76,
+      cardWidth,
+      cardHeight,
+      cardTemplateSvg: options.cardTemplateSvg ?? null,
       levelGap: options.levelGap ?? 92,
       siblingGap: options.siblingGap ?? 32,
       partnerGap: options.partnerGap ?? 24,
@@ -1251,27 +1268,46 @@ function renderCard(
   const displayName = person?.displayName ?? "Unknown";
   const dates = formatDates(person);
 
-  context.parts.push(
-    `<rect x="${round(x)}" y="${round(y)}" width="${context.options.cardWidth}" height="${context.options.cardHeight}" rx="14" fill="${attr(context.theme.cardBackground)}" stroke="${attr(visual.borderColor)}" stroke-width="2"/>`,
-    `<text x="${round(x + 14)}" y="${round(y + 20)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="${attr(context.theme.text)}">${text(truncate(displayName, 24))}</text>`,
-  );
+  if (context.options.cardTemplateSvg) {
+    let svgContent = context.options.cardTemplateSvg
+      .replace(/\{\{displayName\}\}/g, text(truncate(displayName, 24)))
+      .replace(/\{\{strokeColor\}\}/g, attr(visual.borderColor))
+      .replace(/\{\{fillColor\}\}/g, attr(context.theme.cardBackground))
+      .replace(/\{\{textColor\}\}/g, attr(context.theme.text))
+      .replace(/\{\{mutedTextColor\}\}/g, attr(context.theme.mutedText))
+      .replace(/\{\{dates\}\}/g, dates ? text(dates) : "")
+      .replace(/\{\{nickname\}\}/g, person?.nickname ? text(truncate(`“${person.nickname}”`, 26)) : "")
+      .replace(/\{\{tags\}\}/g, buildTagsSvg(person?.tags ?? [], context));
 
-  if (person?.nickname) {
+    let innerSvg = svgContent.replace(/<\?xml[^>]*>/, '').replace(/<!--[\s\S]*?-->/g, '').trim();
+    innerSvg = innerSvg.replace(/^<svg[^>]*>/, `<g transform="translate(${round(x)}, ${round(y)})">`);
+    innerSvg = innerSvg.replace(/<\/svg>$/, `</g>`);
+    
+    context.parts.push(innerSvg);
+  } else {
     context.parts.push(
-      `<text x="${round(x + 14)}" y="${round(y + 38)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(truncate(`“${person.nickname}”`, 26))}</text>`,
+      `<rect x="${round(x)}" y="${round(y)}" width="${context.options.cardWidth}" height="${context.options.cardHeight}" rx="14" fill="${attr(context.theme.cardBackground)}" stroke="${attr(visual.borderColor)}" stroke-width="2"/>`,
+      `<text x="${round(x + 14)}" y="${round(y + 20)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="${attr(context.theme.text)}">${text(truncate(displayName, 24))}</text>`,
+    );
+
+    if (person?.nickname) {
+      context.parts.push(
+        `<text x="${round(x + 14)}" y="${round(y + 38)}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(truncate(`“${person.nickname}”`, 26))}</text>`,
+      );
+    }
+    if (dates) {
+      context.parts.push(
+        `<text x="${round(x + 14)}" y="${round(y + (person?.nickname ? 56 : 40))}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(dates)}</text>`,
+      );
+    }
+    renderTags(
+      person?.tags ?? [],
+      x + context.options.cardWidth - 12,
+      y + 12,
+      context,
     );
   }
-  if (dates) {
-    context.parts.push(
-      `<text x="${round(x + 14)}" y="${round(y + (person?.nickname ? 56 : 40))}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(dates)}</text>`,
-    );
-  }
-  renderTags(
-    person?.tags ?? [],
-    x + context.options.cardWidth - 12,
-    y + 12,
-    context,
-  );
+
   return {
     x: x + context.options.cardWidth / 2,
     y: y + context.options.cardHeight,
@@ -1335,6 +1371,28 @@ function renderTags(
     );
     cursorX -= 4;
   }
+}
+
+function buildTagsSvg(
+  tags: string[],
+  context: RenderContext,
+): string {
+  let parts: string[] = [];
+  let cursorX = 0;
+  for (const tag of tags.slice(0, 3).reverse()) {
+    const color = findStatusColor(tag, context.visualConfig);
+    if (!color) continue;
+    const label = formatStatusLabel(tag);
+    const width = Math.max(24, label.length * 7 + 10);
+    cursorX -= width;
+
+    parts.push(
+      `<rect x="${round(cursorX)}" y="0" width="${round(width)}" height="18" rx="9" fill="${attr(color)}"/>`,
+      `<text x="${round(cursorX + width / 2)}" y="12.5" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">${text(label)}</text>`,
+    );
+    cursorX -= 4;
+  }
+  return parts.join("");
 }
 
 function drawConnector(

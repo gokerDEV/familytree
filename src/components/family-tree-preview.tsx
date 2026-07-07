@@ -16,18 +16,21 @@ import {
 interface FamilyTreePreviewProps {
   source: string;
   visualConfig: FamilyTreeVisualConfig;
+  templateSvg?: string | null;
 }
 
 export function FamilyTreePreview({
   source,
   visualConfig,
+  templateSvg,
 }: FamilyTreePreviewProps) {
   const { result, svg } = useMemo(() => {
     return parseAndRenderFamilyTreeSvg(source, {
       visualConfig,
       showLegend: true,
+      cardTemplateSvg: templateSvg,
     });
-  }, [source, visualConfig]);
+  }, [source, visualConfig, templateSvg]);
 
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });

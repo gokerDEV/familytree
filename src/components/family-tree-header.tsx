@@ -66,6 +66,21 @@ export function FamilyTreeHeader({
             <SelectItem value="romanov">Romanovs</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={visualConfig.cardTemplateId}
+          onValueChange={(val) =>
+            setVisualConfig((prev) => ({ ...prev, cardTemplateId: val || "default" }))
+          }
+        >
+          <SelectTrigger className="w-[180px] h-8 text-xs">
+            <SelectValue placeholder="Card Template" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">Default Rectangle</SelectItem>
+            <SelectItem value="person-00">Template 00</SelectItem>
+            <SelectItem value="person-01">Template 01</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center gap-2">
         <FamilyTreeHowToSheet

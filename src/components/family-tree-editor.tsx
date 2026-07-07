@@ -27,6 +27,7 @@ export function FamilyTreeEditor() {
   const [visualConfig, setVisualConfig] = useState<FamilyTreeVisualConfig>(() =>
     mergeFamilyTreeVisualConfig(),
   );
+  const [templateSvg, setTemplateSvg] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   const isDirty = activeSample !== "custom" && source !== originalSource;
@@ -68,6 +69,17 @@ export function FamilyTreeEditor() {
       );
     }
   }, [visualConfig, isMounted]);
+
+  useEffect(() => {
+    if (visualConfig.cardTemplateId && visualConfig.cardTemplateId !== "default") {
+      fetch(`/templates/${visualConfig.cardTemplateId}.svg`)
+        .then((res) => res.text())
+        .then(setTemplateSvg)
+        .catch(console.error);
+    } else {
+      setTemplateSvg(null);
+    }
+  }, [visualConfig.cardTemplateId]);
 
   const handleResetConfig = () => {
     setVisualConfig(mergeFamilyTreeVisualConfig());
@@ -143,7 +155,11 @@ export function FamilyTreeEditor() {
             minSize={35}
             className="flex flex-col bg-background relative"
           >
-            <FamilyTreePreview source={source} visualConfig={visualConfig} />
+            <FamilyTreePreview
+              source={source}
+              visualConfig={visualConfig}
+              templateSvg={templateSvg}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

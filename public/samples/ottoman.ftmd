@@ -1,5 +1,75 @@
-# Ottoman Empire Family Tree
+# Ottoman Dynasty Family Tree
 
-- Osman Gazi @osman (1258-1324)
-  - Orhan Gazi @orhan (1281-1362)
-    - Murad I @murad (1326-1389)
+- Osman Gazi @osman1 "Osman I" [v] (1258-1324)
+  - + Malhun Hatun @malhun_hatun
+    - Orhan Gazi @orhan1 "Orhan I" [v] (1281-1362)
+      - + Nilüfer Hatun @nilufer_hatun
+        - Murad Hüdavendigâr @murad1 "Murad I" [v] (1326-1389)
+          - + Gülçiçek Hatun @gulcicek_hatun
+            - Bayezid Yıldırım @bayezid1 "Bayezid I" [v] (1360-1403)
+              - + Devlet Hatun @devlet_hatun
+                - Mehmed Çelebi @mehmed1 "Mehmed I" [v] (1389-1421)
+                  - + Emine Hatun @emine_hatun
+                    - Murad II @murad2 "Murad II" [v] (1404-1451)
+                      - + Hüma Hatun @huma_hatun
+                        - Mehmed Fatih @mehmed2 "Mehmed II" [v] (1432-1481)
+                          - + Gülbahar Hatun @gulbahar_hatun_1
+                            - Bayezid II @bayezid2 "Bayezid II" [v] (1447-1512)
+                              - + Gülbahar Hatun @gulbahar_hatun_2
+                                - Selim Yavuz @selim1 "Selim I" [v] (1470-1520)
+                                  - + Hafsa Sultan @hafsa_sultan
+                                    - Süleyman Kanuni @suleyman1 "Süleyman I" [v] (1494-1566)
+                                      - + Hürrem Sultan @hurrem_sultan
+                                        - Mihrimah Sultan @mihrimah_sultan (1522-1578)
+                                        - Selim II @selim2 "Selim II" [v] (1524-1574)
+                                          - + Nurbanu Sultan @nurbanu_sultan
+                                            - Murad III @murad3 "Murad III" [v] (1546-1595)
+                                              - + Safiye Sultan @safiye_sultan
+                                                - Mehmed III @mehmed3 "Mehmed III" [v] (1566-1603)
+                                                  - + Handan Sultan @handan_sultan
+                                                    - Ahmed I @ahmed1 "Ahmed I" [v] (1590-1617)
+                                                      - + Mahfiruz Hatun @mahfiruz_hatun
+                                                        - Osman II @osman2 "Osman II" [v] (1604-1622)
+                                                      - + Kösem Sultan @kosem_sultan
+                                                        - Murad IV @murad4 "Murad IV" [v] (1612-1640)
+                                                        - İbrahim @ibrahim1 "İbrahim I" [v] (1615-1648)
+                                                          - + Turhan Sultan @turhan_sultan
+                                                            - Mehmed IV @mehmed4 "Mehmed IV" [v] (1642-1693)
+                                                              - + Rabia Gülnuş Sultan @rabia_gulnus
+                                                                - Mustafa II @mustafa2 "Mustafa II" [v] (1664-1703)
+                                                                  - + Saliha Sultan @saliha_sultan
+                                                                    - Mahmud I @mahmud1 "Mahmud I" [v] (1696-1754)
+                                                                  - + Şehsuvar Sultan @sehsuvar_sultan
+                                                                    - Osman III @osman3 "Osman III" [v] (1699-1757)
+                                                                - Ahmed III @ahmed3 "Ahmed III" [v] (1673-1736)
+                                                                  - + Mihrişah Kadın @mihrisah_kadin_1
+                                                                    - Mustafa III @mustafa3 "Mustafa III" [v] (1717-1774)
+                                                                      - + Mihrişah Sultan @mihrisah_sultan_2
+                                                                        - Selim III @selim3 "Selim III" [v] (1761-1808)
+                                                                  - + Rabia Şermi Kadın @rabia_sermi
+                                                                    - Abdülhamid I @abdulhamid1 "Abdülhamid I" [v] (1725-1789)
+                                                                      - + Sineperver Sultan @sineperver_sultan
+                                                                        - Mustafa IV @mustafa4 "Mustafa IV" [v] (1779-1808)
+                                                                      - + Nakşidil Sultan @naksidil_sultan
+                                                                        - Mahmud II @mahmud2 "Mahmud II" [v] (1785-1839)
+                                                                          - + Bezmiâlem Sultan @bezmialem_sultan
+                                                                            - Abdülmecid I @abdulmecid1 "Abdülmecid I" [v] (1823-1861)
+                                                                              - + Şevkefza Kadın @sevkefza_kadin
+                                                                                - Murad V @murad5 "Murad V" [v] (1840-1904)
+                                                                              - + Tirimüjgan Kadın @tirimujgan_kadin
+                                                                                - Abdülhamid II @abdulhamid2 "Abdülhamid II" [v] (1842-1918)
+                                                                              - + Gülcemal Kadın @gulcemal_kadin
+                                                                                - Mehmed V Reşad @mehmed5 "Mehmed V" [v] (1844-1918)
+                                                                              - + Gülüstü Hanım @gulustu_hanim
+                                                                                - Mehmed VI Vahideddin @mehmed6 "Mehmed VI" [v] (1861-1926)
+                                                                          - + Pertevniyal Sultan @pertevniyal_sultan
+                                                                            - Abdülaziz @abdulaziz "Abdülaziz" [v] (1830-1876)
+                                                                              - + Hayranıdil Kadın @hayranidil_kadin
+                                                                                - Abdülmecid II @abdulmecid2 "Last Caliph" [v] (1868-1944)
+                                                          - + Saliha Dilaşub Sultan @saliha_dilasub
+                                                            - Süleyman II @suleyman2 "Süleyman II" [v] (1642-1691)
+                                                          - + Hatice Muazzez Sultan @hatice_muazzez
+                                                            - Ahmed II @ahmed2 "Ahmed II" [v] (1643-1695)
+                                                  - + Halime Sultan @halime_sultan
+                                                    - Mustafa I @mustafa1 "Mustafa I" [v] (1591-1639)
+                                        - Bayezid Şehzade @sehzade_bayezid (1525-1561)

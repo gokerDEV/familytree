@@ -646,8 +646,11 @@ export function renderFamilyTreeSvg(
     contentHeight + context.options.padding * 2 + titleHeight + legendHeight,
   );
 
+  const widthMm = width * 0.26458333;
+  const heightMm = height * 0.26458333;
+
   context.parts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${round(width)}" height="${round(height)}" viewBox="0 0 ${round(width)} ${round(height)}" role="img">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${round(widthMm)}mm" height="${round(heightMm)}mm" viewBox="0 0 ${round(width)} ${round(height)}" role="img">`,
     `<rect width="100%" height="100%" fill="${attr(theme.background)}"/>`,
   );
 

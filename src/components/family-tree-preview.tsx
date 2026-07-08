@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -38,10 +38,21 @@ export function FamilyTreePreview({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Zoom in/out
-    const zoomFactor = 0.001; // Scale factor for mouse wheel
+    if (!containerRef.current) return;
+    const zoomFactor = 0.001;
     const delta = -e.deltaY * zoomFactor;
-    setScale((prev) => Math.min(Math.max(0.25, prev * (1 + delta)), 3));
+    const newScale = Math.min(Math.max(0.25, scale * (1 + delta)), 3);
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - containerRect.left;
+    const mouseY = e.clientY - containerRect.top;
+
+    const ratio = newScale / scale;
+    setPan({
+      x: mouseX - (mouseX - pan.x) * ratio,
+      y: mouseY - (mouseY - pan.y) * ratio,
+    });
+    setScale(newScale);
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -64,7 +75,7 @@ export function FamilyTreePreview({
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
-  const fitToWindow = () => {
+  const fitToWindow = useCallback(() => {
     if (!containerRef.current) return;
     const svgElement = containerRef.current.querySelector("svg");
     if (!svgElement) return;
@@ -74,7 +85,6 @@ export function FamilyTreePreview({
 
     const containerRect = containerRef.current.getBoundingClientRect();
 
-    // Calculate required scale with 5% padding
     const newScale =
       Math.min(
         containerRect.width / viewBox.width,
@@ -84,12 +94,59 @@ export function FamilyTreePreview({
     const clampedScale = Math.min(Math.max(0.25, newScale), 3);
     setScale(clampedScale);
 
-    // Center the content
     setPan({
       x: (containerRect.width - viewBox.width * clampedScale) / 2,
       y: (containerRect.height - viewBox.height * clampedScale) / 2,
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.key === "+" || e.key === "=") {
+        setScale((prev) => {
+          const newScale = Math.min(prev * 1.2, 3);
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const ratio = newScale / prev;
+            setPan((p) => ({
+              x: cx - (cx - p.x) * ratio,
+              y: cy - (cy - p.y) * ratio,
+            }));
+          }
+          return newScale;
+        });
+      } else if (e.key === "-") {
+        setScale((prev) => {
+          const newScale = Math.max(prev / 1.2, 0.25);
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const ratio = newScale / prev;
+            setPan((p) => ({
+              x: cx - (cx - p.x) * ratio,
+              y: cy - (cy - p.y) * ratio,
+            }));
+          }
+          return newScale;
+        });
+      } else if (e.key === "0") {
+        fitToWindow();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fitToWindow]);
 
   const downloadSvg = () => {
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });

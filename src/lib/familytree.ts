@@ -118,6 +118,9 @@ export type FamilyTreeVisualConfig = {
   cardTemplateId: string;
 };
 
+export type FamilyTreePersonData = Record<string, string>;
+export type FamilyTreeDataMap = Record<string, FamilyTreePersonData>;
+
 export type FamilyTreeRenderOptions = FamilyTreeParseOptions & {
   theme?: Partial<FamilyTreeTheme>;
   visualConfig?: Partial<FamilyTreeVisualConfig>;
@@ -130,7 +133,10 @@ export type FamilyTreeRenderOptions = FamilyTreeParseOptions & {
   showLegend?: boolean;
   title?: string;
   cardTemplateSvg?: string | null;
+  dataMap?: FamilyTreeDataMap;
 };
+
+export const FAMILY_TREE_DATA_MAP_STORAGE_KEY = "familytree.data-map.v1";
 
 export const DEFAULT_FAMILY_TREE_THEME: FamilyTreeTheme = {
   background: "#ffffff",
@@ -275,7 +281,8 @@ export function mergeFamilyTreeVisualConfig(
       ...DEFAULT_FAMILY_TREE_VISUAL_CONFIG.connectors,
       ...stored?.connectors,
     },
-    cardTemplateId: stored?.cardTemplateId || DEFAULT_FAMILY_TREE_VISUAL_CONFIG.cardTemplateId,
+    cardTemplateId:
+      stored?.cardTemplateId || DEFAULT_FAMILY_TREE_VISUAL_CONFIG.cardTemplateId,
   };
 }
 
@@ -327,7 +334,6 @@ type ParsedItem = {
 };
 
 type PersonDraft = Omit<FamilyTreePerson, "id"> & { explicitId?: string };
-type Size = { width: number; height: number };
 type Point = { x: number; y: number };
 
 type RowLayoutSpouse = {
@@ -342,7 +348,7 @@ type RowLayoutUnion = {
   spousePersonId?: string;
   weddingX: number;
   weddingY: number;
-  childrenIds: string[]; // for connecting lines
+  childrenIds: string[];
 };
 
 type RowLayoutNode = {
@@ -357,19 +363,25 @@ type RowLayoutNode = {
   unions: RowLayoutUnion[];
 };
 
+type RenderResolvedOptions = {
+  cardWidth: number;
+  cardHeight: number;
+  levelGap: number;
+  siblingGap: number;
+  partnerGap: number;
+  padding: number;
+  showLegend: boolean;
+  title?: string;
+  indentSize: number;
+  cardTemplateSvg: string | null;
+  dataMap?: FamilyTreeDataMap;
+};
+
 type RenderContext = {
   document: FamilyTreeDocument;
   personById: Map<string, FamilyTreePerson>;
   unionById: Map<string, FamilyTreeUnion>;
-  options: Required<
-    Omit<
-      FamilyTreeRenderOptions,
-      "theme" | "visualConfig" | "title" | "indentSize"
-    >
-  > & {
-    title?: string;
-    indentSize: number;
-  };
+  options: RenderResolvedOptions;
   theme: FamilyTreeTheme;
   visualConfig: FamilyTreeVisualConfig;
   parts: string[];
@@ -509,13 +521,13 @@ export function parseFamilyTree(
         );
         if (!partnerDraft) return;
         const partner = getOrCreatePerson(document, partnerDraft);
+        const personNode = createPersonNode(
+          person.id,
+          line,
+          parsedItem.relationKind,
+        );
 
         if (!parent) {
-          const personNode = createPersonNode(
-            person.id,
-            line,
-            parsedItem.relationKind,
-          );
           const unionNode = createUnion(
             document,
             parsedItem.unionKind ?? "current",
@@ -529,18 +541,7 @@ export function parseFamilyTree(
           return;
         }
 
-        const personNode = createPersonNode(
-          person.id,
-          line,
-          parsedItem.relationKind,
-        );
-        attachPerson(
-          document,
-          parent,
-          personNode,
-          parsedItem.relationKind,
-          line,
-        );
+        attachPerson(document, parent, personNode, parsedItem.relationKind, line);
         const unionNode = createUnion(
           document,
           parsedItem.unionKind ?? "current",
@@ -592,26 +593,16 @@ export function renderFamilyTreeSvg(
   const document = "document" in input ? input.document : input;
   const theme = { ...DEFAULT_FAMILY_TREE_THEME, ...options.theme };
   const visualConfig = mergeFamilyTreeVisualConfig(options.visualConfig);
-
-  let cardWidth = options.cardWidth ?? 188;
-  let cardHeight = options.cardHeight ?? 76;
-
-  if (options.cardTemplateSvg) {
-    const templateMatch = options.cardTemplateSvg.match(/viewBox="[^"]* ([^" ]+) ([^" ]+)"/);
-    if (templateMatch) {
-      cardWidth = parseFloat(templateMatch[1]);
-      cardHeight = parseFloat(templateMatch[2]);
-    }
-  }
-
+  const templateSize = getTemplateSize(options.cardTemplateSvg ?? null);
   const context: RenderContext = {
     document,
     personById: new Map(document.persons.map((person) => [person.id, person])),
     unionById: new Map(document.unions.map((union) => [union.id, union])),
     options: {
-      cardWidth,
-      cardHeight,
+      cardWidth: templateSize?.width ?? options.cardWidth ?? 188,
+      cardHeight: templateSize?.height ?? options.cardHeight ?? 76,
       cardTemplateSvg: options.cardTemplateSvg ?? null,
+      dataMap: options.dataMap,
       levelGap: options.levelGap ?? 92,
       siblingGap: options.siblingGap ?? 32,
       partnerGap: options.partnerGap ?? 24,
@@ -627,15 +618,13 @@ export function renderFamilyTreeSvg(
 
   const rows = extractRows(document.roots, context);
   const bounds = computeRowLayouts(rows, context);
-  const contentWidth = bounds.maxX - bounds.minX;
-  const contentHeight = bounds.maxY - bounds.minY;
+  const contentWidth = Math.max(0, bounds.maxX - bounds.minX);
+  const contentHeight = Math.max(0, bounds.maxY - bounds.minY);
   const titleHeight = context.options.title ? 44 : 0;
-
   const width = Math.max(640, contentWidth + context.options.padding * 2);
 
   let legendHeight = 0;
   let legendLayout: ReturnType<typeof layoutLegend> | undefined;
-
   if (context.options.showLegend) {
     legendLayout = layoutLegend(context, width - context.options.padding * 2);
     legendHeight = legendLayout.height + 20;
@@ -645,7 +634,6 @@ export function renderFamilyTreeSvg(
     320,
     contentHeight + context.options.padding * 2 + titleHeight + legendHeight,
   );
-
   const widthMm = width * 0.26458333;
   const heightMm = height * 0.26458333;
 
@@ -662,14 +650,11 @@ export function renderFamilyTreeSvg(
 
   const shiftX = context.options.padding - bounds.minX;
   const shiftY = context.options.padding + titleHeight - bounds.minY;
-
-  for (const [depth, nodes] of rows.entries()) {
+  for (const nodes of rows.values()) {
     for (const node of nodes) {
       node.x += shiftX;
       node.y += shiftY;
-      for (const spouse of node.spouses) {
-        spouse.x += shiftX;
-      }
+      for (const spouse of node.spouses) spouse.x += shiftX;
       for (const union of node.unions) {
         union.weddingX += shiftX;
         union.weddingY += shiftY;
@@ -677,15 +662,14 @@ export function renderFamilyTreeSvg(
     }
   }
 
-  for (const [depth, nodes] of rows.entries()) {
-    for (const node of nodes) {
-      renderRowLayoutNode(node, rows, context);
-    }
+  for (const nodes of rows.values()) {
+    for (const node of nodes) renderRowLayoutNode(node, rows, context);
   }
 
   if (context.options.showLegend && legendLayout) {
     renderLegend(height - legendHeight + 10, legendLayout, context);
   }
+
   context.parts.push("</svg>");
   return context.parts.join("");
 }
@@ -908,15 +892,8 @@ function createImplicitUnion(
     line,
     anchorPersonId: parentId,
   };
-
   document.unions.push(union);
-
-  return {
-    kind: "union",
-    unionId: union.id,
-    line,
-    children: [],
-  };
+  return { kind: "union", unionId: union.id, line, children: [] };
 }
 
 function attachPerson(
@@ -1004,7 +981,7 @@ function extractRows(
 
   function addToRow(depth: number, layoutNode: RowLayoutNode) {
     if (!rows.has(depth)) rows.set(depth, []);
-    rows.get(depth)!.push(layoutNode);
+    rows.get(depth)?.push(layoutNode);
   }
 
   function traverse(node: FamilyTreePersonNode, depth: number) {
@@ -1021,21 +998,14 @@ function extractRows(
     };
     addToRow(depth, layoutNode);
 
-    let hasChildrenOrSpouse = false;
-
     for (const u of node.unions) {
       const unionInfo = context.unionById.get(u.unionId);
       if (!unionInfo) continue;
-
       const visiblePartnerIds = unionInfo.partnerIds.filter(
         (id) => id !== unionInfo.anchorPersonId,
       );
       const relationType =
         unionInfo.kind === "former" ? "formerSpouse" : "spouse";
-
-      if (visiblePartnerIds.length > 0 || u.children.length > 0) {
-        hasChildrenOrSpouse = true;
-      }
 
       for (const partnerId of visiblePartnerIds) {
         layoutNode.spouses.push({
@@ -1044,18 +1014,13 @@ function extractRows(
           relationType,
           x: 0,
         });
-
         layoutNode.unions.push({
           unionId: unionInfo.id,
           spousePersonId: partnerId,
           weddingX: 0,
           weddingY: 0,
-          childrenIds: u.children.map((c) => c.personId),
+          childrenIds: u.children.map((child) => child.personId),
         });
-
-        for (const child of u.children) {
-          traverse(child, depth + 1);
-        }
       }
 
       if (visiblePartnerIds.length === 0 && u.children.length > 0) {
@@ -1063,89 +1028,61 @@ function extractRows(
           unionId: unionInfo.id,
           weddingX: 0,
           weddingY: 0,
-          childrenIds: u.children.map((c) => c.personId),
+          childrenIds: u.children.map((child) => child.personId),
         });
-        for (const child of u.children) {
-          traverse(child, depth + 1);
-        }
       }
-    }
 
-    if (!hasChildrenOrSpouse) {
-      addToRow(depth + 1, {
-        isDummy: true,
-        depth: depth + 1,
-        x: 0,
-        y: 0,
-        spouses: [],
-        unions: [],
-      });
+      for (const child of u.children) traverse(child, depth + 1);
     }
   }
 
   for (const root of roots) {
-    if (root.kind === "person") {
-      traverse(root, 0);
-    }
+    if (root.kind === "person") traverse(root, 0);
   }
-
   return rows;
 }
 
-function computeRowLayouts(
-  rows: Map<number, RowLayoutNode[]>,
-  context: RenderContext,
-) {
+function computeRowLayouts(rows: Map<number, RowLayoutNode[]>, context: RenderContext) {
   const cardW = context.options.cardWidth;
   const cardH = context.options.cardHeight;
   const spouseGap = context.options.partnerGap;
   const siblingGap = spouseGap * 2;
   const levelGap = context.options.levelGap;
-
   let minGlobalX = Infinity;
   let maxGlobalX = -Infinity;
   let maxGlobalY = -Infinity;
 
   for (const [depth, nodes] of rows.entries()) {
     let currentX = 0;
-
-    // Assign horizontal positions sequentially
     for (const node of nodes) {
       node.x = currentX;
       currentX += cardW;
-
       for (const spouse of node.spouses) {
-        // Use 1.5n gap for former spouses to detach them visually
-        const gap =
-          spouse.relationType === "formerSpouse" ? spouseGap * 1.5 : spouseGap;
-        currentX += gap;
+        currentX += spouseGap;
         spouse.x = currentX;
         currentX += cardW;
       }
       currentX += siblingGap;
     }
 
-    const rowWidth = currentX - siblingGap;
-    const shiftX = -(rowWidth / 2);
+    const rowWidth = currentX > 0 ? currentX - siblingGap : 0;
+    const shiftX = -rowWidth / 2;
     const rowY = depth * (cardH + levelGap);
 
     for (const node of nodes) {
       node.x += shiftX;
       node.y = rowY;
-
-      if (node.x < minGlobalX) minGlobalX = node.x;
-      if (node.x + cardW > maxGlobalX) maxGlobalX = node.x + cardW;
-      if (node.y + cardH > maxGlobalY) maxGlobalY = node.y + cardH;
+      minGlobalX = Math.min(minGlobalX, node.x);
+      maxGlobalX = Math.max(maxGlobalX, node.x + cardW);
+      maxGlobalY = Math.max(maxGlobalY, node.y + cardH);
 
       const anchorCenter = node.x + cardW / 2;
-
       for (const spouse of node.spouses) {
         spouse.x += shiftX;
-        if (spouse.x + cardW > maxGlobalX) maxGlobalX = spouse.x + cardW;
-
+        maxGlobalX = Math.max(maxGlobalX, spouse.x + cardW);
         const spouseCenter = spouse.x + cardW / 2;
         const union = node.unions.find(
-          (u) => u.spousePersonId === spouse.personId,
+          (entry) => entry.spousePersonId === spouse.personId,
         );
         if (union) {
           union.weddingX = spouseCenter;
@@ -1158,11 +1095,12 @@ function computeRowLayouts(
           union.weddingX = anchorCenter;
           union.weddingY = rowY + cardH + 26;
         }
-        if (union.weddingY + 5 > maxGlobalY) maxGlobalY = union.weddingY + 5;
+        maxGlobalY = Math.max(maxGlobalY, union.weddingY + 5);
       }
     }
   }
 
+  if (minGlobalX === Infinity) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   return { minX: minGlobalX, maxX: maxGlobalX, minY: 0, maxY: maxGlobalY };
 }
 
@@ -1172,8 +1110,7 @@ function renderRowLayoutNode(
   context: RenderContext,
 ) {
   if (node.isDummy) return;
-
-  const person = context.personById.get(node.personId!);
+  const person = context.personById.get(node.personId ?? "");
   renderCard(
     person,
     node.x,
@@ -1187,71 +1124,66 @@ function renderRowLayoutNode(
     renderCard(spousePerson, spouse.x, node.y, context, spouse.relationType);
   }
 
-  const isCurved = context.visualConfig.connectors.shape === "curved";
-
   for (const union of node.unions) {
     const unionPoint = { x: union.weddingX, y: union.weddingY };
-
     const spouse = node.spouses.find(
-      (s) => s.personId === union.spousePersonId,
+      (entry) => entry.personId === union.spousePersonId,
     );
+    const unionInfo = context.unionById.get(union.unionId);
+    const relationType = unionInfo?.kind === "former" ? "formerSpouse" : "spouse";
+
     if (spouse) {
-      const spouseBottom = {
-        x: spouse.x + context.options.cardWidth / 2,
-        y: node.y + context.options.cardHeight,
-      };
-      drawConnector(spouseBottom, unionPoint, context, "biological");
+      drawConnector(
+        {
+          x: spouse.x + context.options.cardWidth / 2,
+          y: node.y + context.options.cardHeight,
+        },
+        unionPoint,
+        context,
+        relationType,
+      );
     }
 
-    const anchorBottom = {
-      x: node.x + context.options.cardWidth / 2,
-      y: node.y + context.options.cardHeight,
-    };
-    drawConnector(anchorBottom, unionPoint, context, "biological");
-
-    const bloodlineRule = context.visualConfig.relations.biological;
-    context.parts.push(
-      `<circle cx="${round(unionPoint.x)}" cy="${round(unionPoint.y)}" r="5" fill="${attr(bloodlineRule.color)}"/>`,
+    drawConnector(
+      {
+        x: node.x + context.options.cardWidth / 2,
+        y: node.y + context.options.cardHeight,
+      },
+      unionPoint,
+      context,
+      relationType,
     );
 
-    if (union.childrenIds.length > 0) {
-      const childNodes = (rows.get(node.depth + 1) || []).filter(
-        (n) => !n.isDummy && union.childrenIds.includes(n.personId!),
+    const unionRule = context.visualConfig.relations[relationType];
+    context.parts.push(
+      `<circle cx="${round(unionPoint.x)}" cy="${round(unionPoint.y)}" r="5" fill="${attr(unionRule.color)}"/>`,
+    );
+
+    if (!union.childrenIds.length) continue;
+    const childNodes = (rows.get(node.depth + 1) || []).filter(
+      (child) => !child.isDummy && union.childrenIds.includes(child.personId ?? ""),
+    );
+
+    for (const child of childNodes) {
+      const childAnchorCenter = {
+        x: child.x + context.options.cardWidth / 2,
+        y: child.y,
+      };
+      const childPerson = context.personById.get(child.personId ?? "");
+      const relation = child.incomingRelationKind || "biological";
+      const childColor = resolvePersonEffectiveColor(
+        childPerson,
+        relation,
+        context.visualConfig,
       );
-
-      const allUnionsInRow = rows.get(node.depth)!.flatMap((n) => n.unions).filter((u) => u.childrenIds.length > 0);
-      const unionIndex = allUnionsInRow.findIndex((u) => u.unionId === union.unionId);
-      const stagger = unionIndex % 2 === 0 ? 14 : 28;
-
-      for (const child of childNodes) {
-        const childAnchorCenter = {
-          x: child.x + context.options.cardWidth / 2,
-          y: child.y,
-        };
-        const childPerson = context.personById.get(child.personId!);
-        const childColor = resolvePersonEffectiveColor(
-          childPerson,
-          child.incomingRelationKind || "biological",
-          context.visualConfig,
-        );
-        const rule =
-          context.visualConfig.relations[
-          child.incomingRelationKind || "biological"
-          ];
-
-        if (isCurved) {
-          const path = curvedPath(unionPoint, childAnchorCenter);
-          context.parts.push(
-            `<path d="${path}" fill="none" stroke="${attr(childColor)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dash(rule.lineStyle)}/>`,
-          );
-        } else {
-          const horizontalY = unionPoint.y + stagger;
-          const path = `M ${round(unionPoint.x)} ${round(unionPoint.y)} V ${round(horizontalY)} H ${round(childAnchorCenter.x)} V ${round(childAnchorCenter.y)}`;
-          context.parts.push(
-            `<path d="${path}" fill="none" stroke="${attr(childColor)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dash(rule.lineStyle)}/>`,
-          );
-        }
-      }
+      const rule = context.visualConfig.relations[relation];
+      const path =
+        context.visualConfig.connectors.shape === "curved"
+          ? curvedPath(unionPoint, childAnchorCenter)
+          : elbowPath(unionPoint, childAnchorCenter);
+      context.parts.push(
+        `<path d="${path}" fill="none" stroke="${attr(childColor)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dash(rule.lineStyle)}/>`,
+      );
     }
   }
 }
@@ -1263,29 +1195,28 @@ function renderCard(
   context: RenderContext,
   incomingRelation: keyof FamilyTreeVisualConfig["relations"],
 ): Point {
-  const visual = resolvePersonVisual(
-    person,
-    incomingRelation,
-    context.visualConfig,
-  );
+  const visual = resolvePersonVisual(person, incomingRelation, context.visualConfig);
   const displayName = person?.displayName ?? "Unknown";
   const dates = formatDates(person);
 
   if (context.options.cardTemplateSvg) {
-    let svgContent = context.options.cardTemplateSvg
-      .replace(/\{\{displayName\}\}/g, text(truncate(displayName, 24)))
-      .replace(/\{\{strokeColor\}\}/g, attr(visual.borderColor))
-      .replace(/\{\{fillColor\}\}/g, attr(context.theme.cardBackground))
-      .replace(/\{\{textColor\}\}/g, attr(context.theme.text))
-      .replace(/\{\{mutedTextColor\}\}/g, attr(context.theme.mutedText))
-      .replace(/\{\{dates\}\}/g, dates ? text(dates) : "")
-      .replace(/\{\{nickname\}\}/g, person?.nickname ? text(truncate(`“${person.nickname}”`, 26)) : "")
-      .replace(/\{\{tags\}\}/g, buildTagsSvg(person?.tags ?? [], context));
-
-    let innerSvg = svgContent.replace(/<\?xml[^>]*>/, '').replace(/<!--[\s\S]*?-->/g, '').trim();
-    innerSvg = innerSvg.replace(/^<svg[^>]*>/, `<g transform="translate(${round(x)}, ${round(y)})">`);
-    innerSvg = innerSvg.replace(/<\/svg>$/, `</g>`);
-    
+    const svgContent = renderCardTemplate(
+      context.options.cardTemplateSvg,
+      person,
+      context,
+      visual.borderColor,
+      displayName,
+      dates,
+    );
+    let innerSvg = svgContent
+      .replace(/<\?xml[^>]*>/, "")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .trim();
+    innerSvg = innerSvg.replace(
+      /^<svg[^>]*>/,
+      `<g transform="translate(${round(x)}, ${round(y)})">`,
+    );
+    innerSvg = innerSvg.replace(/<\/svg>$/, "</g>");
     context.parts.push(innerSvg);
   } else {
     context.parts.push(
@@ -1303,18 +1234,93 @@ function renderCard(
         `<text x="${round(x + 14)}" y="${round(y + (person?.nickname ? 56 : 40))}" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${attr(context.theme.mutedText)}">${text(dates)}</text>`,
       );
     }
-    renderTags(
-      person?.tags ?? [],
-      x + context.options.cardWidth - 12,
-      y + 12,
-      context,
-    );
+    renderTags(person?.tags ?? [], x + context.options.cardWidth - 12, y + 12, context);
   }
 
   return {
     x: x + context.options.cardWidth / 2,
     y: y + context.options.cardHeight,
   };
+}
+
+function renderCardTemplate(
+  template: string,
+  person: FamilyTreePerson | undefined,
+  context: RenderContext,
+  borderColor: string,
+  displayName: string,
+  dates?: string,
+): string {
+  const personData = getPersonData(person, context.options.dataMap);
+  return template
+    .replace(/\{\{\{data:([A-Za-z0-9_-]+)\}\}\}/g, (_, key: string) =>
+      attr(personData[key] ?? ""),
+    )
+    .replace(/\{\{([A-Za-z0-9_-]+)\}\}/g, (_, key: string) =>
+      resolveBuiltinTemplateValue(key, person, context, borderColor, displayName, dates),
+    );
+}
+
+function resolveBuiltinTemplateValue(
+  key: string,
+  person: FamilyTreePerson | undefined,
+  context: RenderContext,
+  borderColor: string,
+  displayName: string,
+  dates?: string,
+): string {
+  switch (key) {
+    case "id":
+      return attr(person?.id ?? "");
+    case "refId":
+      return attr(person ? `@${person.id}` : "");
+    case "displayName":
+      return text(truncate(displayName, 24));
+    case "name":
+      return text(person?.name ?? "");
+    case "surname":
+      return text(person?.surname ?? "");
+    case "birthDate":
+      return text(person?.birthDate ?? "");
+    case "deathDate":
+      return text(person?.deathDate ?? "");
+    case "dates":
+      return dates ? text(dates) : "";
+    case "nickname":
+      return person?.nickname ? text(truncate(`“${person.nickname}”`, 26)) : "";
+    case "info":
+      return text(person?.info ?? "");
+    case "strokeColor":
+      return attr(borderColor);
+    case "fillColor":
+      return attr(context.theme.cardBackground);
+    case "textColor":
+      return attr(context.theme.text);
+    case "mutedTextColor":
+      return attr(context.theme.mutedText);
+    case "tags":
+      return buildTagsSvg(person?.tags ?? [], context);
+    default:
+      return "";
+  }
+}
+
+function getPersonData(
+  person: FamilyTreePerson | undefined,
+  dataMap?: FamilyTreeDataMap,
+): FamilyTreePersonData {
+  if (!person || !dataMap) return {};
+  return dataMap[person.id] ?? dataMap[`@${person.id}`] ?? {};
+}
+
+function getTemplateSize(template: string | null): { width: number; height: number } | undefined {
+  if (!template) return undefined;
+  const viewBox = template.match(/viewBox="\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)\s*"/);
+  if (!viewBox) return undefined;
+  const width = Number.parseFloat(viewBox[1] ?? "");
+  const height = Number.parseFloat(viewBox[2] ?? "");
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return undefined;
+  return { width, height };
 }
 
 function resolvePersonEffectiveColor(
@@ -1332,13 +1338,8 @@ function resolvePersonVisual(
   config: FamilyTreeVisualConfig,
 ) {
   const relationRule = config.relations[incomingRelation];
-  const baseColor = resolvePersonEffectiveColor(
-    person,
-    incomingRelation,
-    config,
-  );
+  const baseColor = resolvePersonEffectiveColor(person, incomingRelation, config);
   const isDeceased = !!person?.deathDate;
-
   return {
     borderColor: isDeceased
       ? desaturateHexColor(baseColor, config.deceased.desaturate)
@@ -1348,18 +1349,11 @@ function resolvePersonVisual(
 }
 
 function formatStatusLabel(tag: string): string {
-  if (tag.startsWith("m:")) {
-    return tag.slice(2);
-  }
+  if (tag.startsWith("m:")) return tag.slice(2);
   return tag;
 }
 
-function renderTags(
-  tags: string[],
-  rightX: number,
-  y: number,
-  context: RenderContext,
-): void {
+function renderTags(tags: string[], rightX: number, y: number, context: RenderContext): void {
   let cursorX = rightX;
   for (const tag of tags.slice(0, 3).reverse()) {
     const color = findStatusColor(tag, context.visualConfig);
@@ -1367,7 +1361,6 @@ function renderTags(
     const label = formatStatusLabel(tag);
     const width = Math.max(24, label.length * 7 + 10);
     cursorX -= width;
-
     context.parts.push(
       `<rect x="${round(cursorX)}" y="${round(y)}" width="${round(width)}" height="18" rx="9" fill="${attr(color)}"/>`,
       `<text x="${round(cursorX + width / 2)}" y="${round(y + 12.5)}" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">${text(label)}</text>`,
@@ -1376,22 +1369,18 @@ function renderTags(
   }
 }
 
-function buildTagsSvg(
-  tags: string[],
-  context: RenderContext,
-): string {
-  let parts: string[] = [];
-  let cursorX = 0;
+function buildTagsSvg(tags: string[], context: RenderContext): string {
+  const parts: string[] = [];
+  let cursorX = context.options.cardWidth - 12;
   for (const tag of tags.slice(0, 3).reverse()) {
     const color = findStatusColor(tag, context.visualConfig);
     if (!color) continue;
     const label = formatStatusLabel(tag);
     const width = Math.max(24, label.length * 7 + 10);
     cursorX -= width;
-
     parts.push(
-      `<rect x="${round(cursorX)}" y="0" width="${round(width)}" height="18" rx="9" fill="${attr(color)}"/>`,
-      `<text x="${round(cursorX + width / 2)}" y="12.5" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">${text(label)}</text>`,
+      `<rect x="${round(cursorX)}" y="12" width="${round(width)}" height="18" rx="9" fill="${attr(color)}"/>`,
+      `<text x="${round(cursorX + width / 2)}" y="24.5" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="700" fill="#ffffff">${text(label)}</text>`,
     );
     cursorX -= 4;
   }
@@ -1420,17 +1409,8 @@ function layoutLegend(context: RenderContext, maxWidth: number) {
     color: rule.color,
     width: 24 + rule.label.length * 7,
   }));
-
-  const rows: Array<
-    Array<{ x: number; y: number; label: string; color: string; width: number }>
-  > = [];
-  let currentRow: Array<{
-    x: number;
-    y: number;
-    label: string;
-    color: string;
-    width: number;
-  }> = [];
+  const rows: Array<Array<{ x: number; y: number; label: string; color: string; width: number }>> = [];
+  let currentRow: Array<{ x: number; y: number; label: string; color: string; width: number }> = [];
   let currentRowWidth = 0;
   const itemGap = 32;
   const rowHeight = 24;
@@ -1444,22 +1424,19 @@ function layoutLegend(context: RenderContext, maxWidth: number) {
     currentRow.push({ ...item, x: 0, y: 0 });
     currentRowWidth += item.width + (currentRow.length > 1 ? itemGap : 0);
   }
-  if (currentRow.length > 0) {
-    rows.push(currentRow);
-  }
+  if (currentRow.length > 0) rows.push(currentRow);
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+  rows.forEach((row, rowIndex) => {
     const rowWidth =
       row.reduce((sum, item) => sum + item.width, 0) +
       (row.length - 1) * itemGap;
     let currentX = maxWidth / 2 - rowWidth / 2;
     for (const item of row) {
       item.x = currentX;
-      item.y = i * rowHeight;
+      item.y = rowIndex * rowHeight;
       currentX += item.width + itemGap;
     }
-  }
+  });
 
   return { rows, width: maxWidth, height: rows.length * rowHeight };
 }
@@ -1513,9 +1490,7 @@ function findStatusColor(
   tag: string,
   config: FamilyTreeVisualConfig,
 ): string | undefined {
-  if (tag === "v" && config.statuses.heir.visible) {
-    return config.statuses.heir.color;
-  }
+  if (tag === "v" && config.statuses.heir.visible) return config.statuses.heir.color;
   if (tag.startsWith("m") && config.statuses.inheritance.visible) {
     return config.statuses.inheritance.color;
   }
@@ -1525,9 +1500,7 @@ function findStatusColor(
   if (tag === "red" && config.statuses.renounced.visible) {
     return config.statuses.renounced.color;
   }
-  if (tag === "will" && config.statuses.will.visible) {
-    return config.statuses.will.color;
-  }
+  if (tag === "will" && config.statuses.will.visible) return config.statuses.will.color;
   return undefined;
 }
 
@@ -1593,14 +1566,13 @@ function round(value: number): string {
 function desaturateHexColor(hex: string, amount: number): string {
   if (amount <= 0) return hex;
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const desaturateFactor = Math.min(100, Math.max(0, amount)) / 100;
-  const nr = Math.round(r + (luminance - r) * desaturateFactor);
-  const ng = Math.round(g + (luminance - g) * desaturateFactor);
-  const nb = Math.round(b + (luminance - b) * desaturateFactor);
-
-  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+  const red = Number.parseInt(hex.slice(1, 3), 16);
+  const green = Number.parseInt(hex.slice(3, 5), 16);
+  const blue = Number.parseInt(hex.slice(5, 7), 16);
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  const factor = Math.min(100, Math.max(0, amount)) / 100;
+  const nextRed = Math.round(red + (luminance - red) * factor);
+  const nextGreen = Math.round(green + (luminance - green) * factor);
+  const nextBlue = Math.round(blue + (luminance - blue) * factor);
+  return `#${nextRed.toString(16).padStart(2, "0")}${nextGreen.toString(16).padStart(2, "0")}${nextBlue.toString(16).padStart(2, "0")}`;
 }
